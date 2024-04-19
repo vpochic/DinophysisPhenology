@@ -1,0 +1,5 @@
+This folder 'Phenology' contains code that analyses Dinophysis phenology sensu lato.
+
+The files 'GAM ...' are R scripts used for fitting Generalized Additive Models to phytoplankton count data, for Mesodinium and Dinophysis.
+
+The file 'Dino phenology analysis REPHY.R' is a R script for analysing Dinophysis phenology without models (violin plots mainly)
