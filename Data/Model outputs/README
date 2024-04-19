@@ -1,2 +1,3 @@
 This folder contains model outputs from GAMs so that we don't have to re-run the model everytime we want to use the data for plots or else.
 The files are named with the day they were obtained to keep track of the model version that was used.
+When MESO is present in the name, it's a Mesodinium phenology. If no precision, it's Dinophysis.
