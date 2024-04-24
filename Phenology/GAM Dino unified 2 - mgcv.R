@@ -1,6 +1,6 @@
 ###### GAM for Dinophysis phenology with mgcv - unified 2 ###
 ## V. POCHIC
-# 2024-04-18
+# 2024-04-19
 
 # Main difference with GAM Dino unified : replacing the North Sea sites (which
 # hardly ever see a Dinophysis cell) with Sète Mer (adding a 4th Mediterranean
@@ -37,7 +37,7 @@ Table_phyto_OL <- filter(Table_phyto_taxon, Code_point_Libelle %in%
                              'Parc Leucate 2', 'Bouzigues (a)', 'Sète mer',
                              'Diana centre')
                          ) %>%
-  filter(Year >= 2007)
+  filter(Year >= 2007 & Year <= 2022)
 
 #### More zeros ####
 
@@ -53,16 +53,15 @@ Table_Dino_zeros <- Table_Dino_zeros %>%
   # Getting rid of some unwelcome guests (who got onboard because the taxon
   # name contains 'sali')
   select(-(contains('Diplo')))
-# Ideas for the future : 
-# do the same for the Dino-acuminata complex, for tripos + caudata...
+
+# Save Table_Dino_zeros so we don't have to re-run the model to plot again
+# write.csv2(Table_Dino_zeros, 'Table_Dino_zeros2.csv', row.names = FALSE,
+# fileEncoding = "ISO-8859-1")
+
 
 ### Clean the environment
 rm(Table_phyto_taxon)
 rm(Table_phyto_OL)
-
-# Save Table_Dino_zeros so we don't have to re-run the model to plot again
-# write.csv2(Table_Dino_zeros, 'Table_Dino_zeros.csv', row.names = FALSE,
-# fileEncoding = "ISO-8859-1")
 
 ########## Organizing the data #######
 #### Seasonality ####
@@ -81,10 +80,9 @@ Season_Dino <- Table_Dino_zeros %>%
   ### We replace these values with 0. Note that for a given date, we can have
   # one Dinophysis species counted in 10 mL and another in 100 mL
   ## That's why we have to proceed taxon by taxon
-  mutate(Dinophysis = ifelse(Dinophysis %% 100 != 0, 0, Dinophysis)) %>%
   mutate(across(.cols = c('Dinophysis', 'Dinophysis + phalacroma', 'Dinophysis acuta',
                 'Dinophysis acuminata', 'Dinophysis caudata', 'Dinophysis tripos',
-                'Dinophysis sacculus', 'Dinophysis fortii', 
+                'Dinophysis sacculus', 'Dinophysis fortii',
                 'Dinophysis hastata + odiosa'), .fns = ~ ifelse(. %% 100 != 0, 0, .))) %>%
   # And creating some count variables for Dinophysis as a genus
   mutate(Dinophysis_genus = rowSums(across(contains('Dinophysis')))) %>%
@@ -101,7 +99,6 @@ Season_Dino <- Table_Dino_zeros %>%
   filter(true_count < 500) %>%
   # converting the site to factor for the model
   mutate(Code_point_Libelle = as.factor(Code_point_Libelle))
-
 
 # Checking the homogeneity of the sampling between years
 # We make a histogram of samples for the 17 years (2006-2022)
@@ -554,6 +551,10 @@ pred_plot <- pred %>%
 # (by applying the inverse link function)
 response_pred_plot <- as.data.frame(pred_plot) %>%
   mutate(across(c('median.fit', 'lwrS', 'uprS', 'lwrP', 'uprP'), ~ ilink(.)))
+
+# And save that shall we
+# write.csv2(response_pred_plot, 'response_pred_plot_DINO_20240424.csv',
+#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
 
 # You can check that the backtransformation by the inverse link function
 # worked by comparing the pred_plot and response_pred_plot tables.

@@ -1,6 +1,6 @@
 #### Phenology analysis - Dinophysis REPHY
 ## V. POCHIC
-# 2024-04-19
+# 2024-04-23
 
 #### Packages ####
 library(tidyverse)
@@ -8,6 +8,7 @@ library(ggplot2)
 library(viridis)
 library(see)
 library(ggnewscale)
+library(ghibli)
 
 #### Import data ####
 
@@ -313,6 +314,10 @@ Table_hydro_daily <- left_join(Daily_basis, Table_hydro_fortnightly,
   filter(is.na(TEMP.med) == FALSE) %>%
   group_by(Day, Code_point_Libelle)
 
+# Let's save this hydrology table for later
+# write.csv2(Table_hydro_daily, 'Table_hydro_daily_20240424.csv', row.names = FALSE,
+#            fileEncoding = 'ISO-8859-1')
+
 ### Violin plot of Dinophysis observations (weighted by true_count), plus
 # maxima as points, and with the heatmap for temperature
 ggplot(data = Season_plot, aes(x = Code_point_Libelle, y = Day)) +
@@ -362,8 +367,8 @@ ggplot(data = Season_plot, aes(x = Code_point_Libelle, y = Day)) +
   )
 
 # Save that beautiful shit!!!!
-ggsave('Dinophysis_phenology_half-violin_weighted_heatmap.tiff', width = 160, height = 320,
-       units = 'mm', compression = 'lzw', dpi = 300)
+# ggsave('Dinophysis_phenology_half-violin_weighted_heatmap.tiff', width = 160, height = 320,
+#        units = 'mm', compression = 'lzw', dpi = 300)
 
 #### Test : Fragilidium ####
 
@@ -396,3 +401,108 @@ pivot_wider(names_from = Taxon, values_from = Comptage, values_fill = 0) %>%
   filter(Fragilidium != 0)
 
 # Not many observations of Fragilidium
+#### Species? ####
+# Is there a difference in seasonality for different taxa of Dinophysis?
+### Re-introducing species in the dataset ####
+
+Season_Dino_longer <- Season_Dino %>%
+  pivot_longer(cols = contains(c('Dinophysis')), 
+               names_to = 'Taxon', 
+               values_to = 'Comptage') %>%
+  # Remove Dinophysis_genus
+  filter(Taxon != 'Dinophysis_genus') %>%
+  # Remove these values that were calculated on Dinophysis_genus
+  select(-c('true_count', 'log_c')) %>%
+  # compute the genus from the first word of 'Taxon' (here, only 'Dinophysis')
+  mutate(Genus = str_extract(Taxon, 'Pseudo-nitzschia|[:alnum:]+'))
+
+### Ok
+
+### Now, we need to group the dataset by sampling site, fortnight, genus, and
+# finally species ('taxon', more accurately)
+
+Season_Dino_longer <- Season_Dino_longer %>%
+  group_by(Code_point_Libelle, Fortnight, Genus, Taxon)
+
+# And now, summarise by sampling site, fortnight, genus, and taxon
+Season_Dino_species <- Season_Dino_longer %>%
+  summarise(Comptage = sum(Comptage), .groups = 'keep')
+
+
+#### A nice plot ####
+
+# A color palette for the nine taxa, with help from package 'ghibli'
+taxo_palette9 <- c(# Dinophysis  
+  'red3',
+  # Dinophysis acuminata-complex (acuminata, sacculus, fortii)
+  '#E48C2AFF', '#CD4F38FF', '#EAD890FF',
+  # Dinophysis acuta
+  '#58A449FF',
+  # Dinophysis caudata and tripos
+  '#274637FF', '#44A57CFF',
+  # Dinophysis hastata + odiosa
+  '#3D4F7DFF',
+  # Dinophysis + phalacroma
+  '#06141FFF'
+  )
+
+# Changing factor order so sampling sites appear in the order we want
+Season_Dino_species <- Season_Dino_species %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Parc Leucate 2', 'Bouzigues (a)',
+                                          'Sète mer', 'Diana centre'))
+
+# And we do the same for the Dinophysis taxa
+Season_Dino_species <- Season_Dino_species %>%
+  mutate(Taxon = as_factor(Taxon)) %>%
+  mutate(Taxon = fct_relevel(Taxon,
+                             'Dinophysis', 'Dinophysis acuminata',
+                             'Dinophysis sacculus', 'Dinophysis fortii',
+                             'Dinophysis acuta', 'Dinophysis caudata',
+                             'Dinophysis tripos', 'Dinophysis hastata + odiosa',
+                             'Dinophysis + phalacroma'))
+
+### Plotting
+ggplot(Season_Dino_species, aes(x = Fortnight, y = Comptage, fill = Taxon)) +
+  geom_col() +
+  facet_wrap(facets = 'Code_point_Libelle', scales = 'free_y') +
+  # Labels
+  labs(title = "Observations of Dinophysis taxa",
+       y = "Sum of observed Dinophysis cells",
+       x = 'Fortnight',
+       fill = 'Taxon'
+  ) +
+  # Color palette
+  scale_fill_discrete(type = taxo_palette9) +
+  # Theme
+  theme(
+    # Background
+    panel.background = element_rect(fill = 'transparent', 
+                                    linewidth = .3, 
+                                    color = 'grey10'),
+    # Grid
+    panel.grid.major.y = element_line(linewidth = .2, color = 'grey25'),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    #Legend
+    legend.background = element_rect(linewidth = .5, color = 'grey10'),
+    legend.title = element_text(size = 11, color = 'grey5'),
+    legend.frame = element_rect(linewidth = .2, color = 'grey25'),
+    legend.position = 'bottom',
+    # Axis text
+    axis.text.x = element_text(size = 5, color = 'grey5'),
+    # Facet labels
+    strip.background = element_rect(fill = 'grey80',
+                                    linewidth = .2,
+                                    color = 'grey10'),
+    strip.text = element_text(color = 'grey5')
+  )
+
+# Save this awesome plot
+# ggsave('Taxa_12sites_Dinophenology.tiff', dpi = 300, width = 300, height = 200,
+#        units = 'mm', compression = 'lzw')

@@ -50,6 +50,10 @@ Table_Meso_zeros <- Table_Meso_zeros %>%
   # name contains 'sali')
   select(-(contains('Diplo')))
 
+# Save the table
+# write.csv2(Table_Meso_zeros, 'Table_Meso_zeros.csv', row.names = FALSE,
+#            fileEncoding = 'ISO-8859-1')
+
 ### Clean the environment
 rm(Table_phyto_taxon)
 rm(Table_phyto_OL)
@@ -298,8 +302,6 @@ rm(test)
 #### Model and basic model checks ####
 # Formulate the GAM
 
-# Inconsistency in the data due to different sampling protocol in Arcachon
-# For now, let's not take these sites into account
 Season_Meso <- filter(Season_Meso, Code_point_Libelle != 'Parc Leucate 2'
                        & Code_point_Libelle != 'Sète mer')
                       # Only zeros in these sites (not suitable for a Poisson
@@ -528,6 +530,10 @@ pred_plot <- pred %>%
 # (by applying the inverse link function)
 response_pred_plot <- as.data.frame(pred_plot) %>%
   mutate(across(c('median.fit', 'lwrS', 'uprS', 'lwrP', 'uprP'), ~ ilink(.)))
+
+# Let's save the response_pred_plot (might be useful later)
+# write.csv2(response_pred_plot, 'response_pred_plot_MESO_20240424.csv',
+#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
 
 # You can check that the backtransformation by the inverse link function
 # worked by comparing the pred_plot and response_pred_plot tables.
