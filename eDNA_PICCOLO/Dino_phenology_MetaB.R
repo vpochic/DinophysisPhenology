@@ -7,6 +7,8 @@
 
 #### Packages ####
 library(tidyverse)
+library(paletteer)
+library(RColorBrewer)
 
 #### Import data ####
 # Table with ASV counts
@@ -53,7 +55,7 @@ Table_ASV_metadata <- filter(Table_ASV_metadata, Site == 'Ouest_Loscolo' |
   mutate(Date = ymd(Date)) %>%
   mutate(Year = year(Date)) %>%
   # Transform Site and Depth into factors
-  mutate(Site = as_factor(Site))
+  mutate(Site = as_factor(Site)) %>%
   mutate(Depth = as_factor(Depth))
 
 ### Treat data to obtain percentage of reads 
@@ -80,9 +82,44 @@ MetaB_Dino <- MetaB_Dino %>%
                                'Fond')))
 
 # Plot
-ggplot(MetaB_Dino, aes(x = Date, y = Depth, size = 2+exp(Fraction_Dinophysis_reads))) +
-  geom_point(color = 'firebrick1', fill = 'firebrick',
-             shape = 21, alpha = .7) +
+ggplot(MetaB_Dino, aes(x = Date, y = Depth,
+                       size = 5+exp(Fraction_Dinophysis_reads),
+                       fill = Fraction_Dinophysis_reads)) +
+  geom_point(color = 'black',
+             shape = 21, alpha = .7, stroke = .5) +
   facet_wrap(facets = 'Site') +
   scale_y_discrete(limits = rev) +
-  theme_classic()
+  scale_fill_distiller(palette = 'Blues', direction = 1) +
+  guides(size = 'none', 
+         fill = guide_legend('Fraction of Dinophysis reads')) +
+  theme(
+    # panel
+    panel.background = element_rect(fill = 'transparent', 
+                                    linewidth = 1, 
+                                    color = 'grey10'),
+    # legend
+    legend.background = element_rect(linewidth = .5, color = 'grey10'),
+    legend.title = element_text(size = 13, color = 'grey5'),
+    legend.frame = element_rect(linewidth = 1, color = 'grey10'),
+    legend.ticks = element_line(linewidth = .2, color = 'grey25'),
+    legend.position = 'bottom',
+    # axis
+    axis.text.y = element_text(color = 'grey5', size = 12),
+    axis.text.x = element_text(color = 'grey5', size = 12),
+    axis.title.y = element_text(color = 'grey5', size = 14),
+    axis.title.x = element_text(color = 'grey5', size = 14),
+    # grid
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_line(linewidth = .5, color = 'grey45'),
+    panel.grid.minor.y = element_blank(),
+    # Facet labels
+    strip.background = element_rect(fill = 'grey80',
+                                    linewidth = 1,
+                                    color = 'grey10'),
+    strip.text = element_text(color = 'grey5', size = 15)
+  )
+
+# Save this (not so good-looking) plot
+# ggsave('eDNA_Dinophysis_OL-BM.tiff', height = 150, width = 200, units = 'mm',
+#        compression = 'lzw', dpi = 300)
