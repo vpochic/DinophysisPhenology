@@ -1,6 +1,6 @@
 #### Phenology analysis - Dinophysis REPHY
 ## V. POCHIC
-# 2024-04-23
+# 2024-04-30
 
 #### Packages ####
 library(tidyverse)
@@ -9,6 +9,7 @@ library(viridis)
 library(see)
 library(ggnewscale)
 library(ghibli)
+library(cmocean)
 
 #### Import data ####
 
@@ -368,6 +369,114 @@ ggplot(data = Season_plot, aes(x = Code_point_Libelle, y = Day)) +
 
 # Save that beautiful shit!!!!
 # ggsave('Dinophysis_phenology_half-violin_weighted_heatmap.tiff', width = 160, height = 320,
+#        units = 'mm', compression = 'lzw', dpi = 300)
+
+#### What about a heatmap for salinity ####
+
+Season_plot <- Season_Dino %>%
+  group_by(Code_point_Libelle, Year) %>%
+  # Filter out zero values (the violin plot doesn't need them)
+  filter(Dinophysis_genus != 0) %>%
+  ungroup() %>%
+  group_by(Code_point_Libelle)
+
+# Plot aesthetics
+pheno_palette12 <- c('red3', 'orangered1', 'dodgerblue4', 'dodgerblue1', 
+                     'chartreuse4', 'chartreuse2','goldenrod3', 'darkgoldenrod1',
+                     'darkorchid4', 'darkorchid1', 'firebrick1', 'deeppink2'
+)
+
+# Re-level factors
+Season_plot <- Season_plot %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Parc Leucate 2', 'Bouzigues (a)',
+                                          'Sète mer', 'Diana centre'))
+
+# Import the hydrological data
+Table_hydro_fortnightly = read.csv2('Table_hydro_fortnightly.csv', header = TRUE,
+                                    fileEncoding = 'ISO-8859-1')
+
+# Create a daily table for plotting the heatmap
+# We create a vector for 'Day of the year'
+Daily_basis <- expand_grid(Day = seq(1,365))
+# And one for 'Fortnight' that matches
+Daily_basis$Fortnight = as.vector(c(rep(1:26, each = 14), 26))
+# We add the site data
+Daily_basis <- expand_grid(Daily_basis,
+                           Code_point_Libelle = unique(Table_hydro_fortnightly$Code_point_Libelle))
+
+# We arrange Daily_basis by Site
+Daily_basis <- Daily_basis %>%
+  group_by(Code_point_Libelle, Day) %>%
+  arrange(Code_point_Libelle)
+
+# Nickel chrome!
+
+Table_hydro_daily <- left_join(Daily_basis, Table_hydro_fortnightly,
+                               by = c('Code_point_Libelle', 'Fortnight'),
+                               suffix  = c('','')) %>%
+  filter(is.na(TEMP.med) == FALSE) %>%
+  filter(is.na(SALI.med) == FALSE) %>%
+  group_by(Day, Code_point_Libelle)
+
+# Let's save this hydrology table for later
+# write.csv2(Table_hydro_daily, 'Table_hydro_daily_20240430.csv', row.names = FALSE,
+#            fileEncoding = 'ISO-8859-1')
+
+### Violin plot of Dinophysis observations (weighted by true_count), plus
+# maxima as points, and with the heatmap for salinity
+ggplot(data = Season_plot, aes(x = Code_point_Libelle, y = Day)) +
+  # First part of the plot : the heatmap of salinity
+  geom_tile(data = Table_hydro_daily,
+            aes(x = Code_point_Libelle, y = Day, fill = TEMP.med
+            )) +
+  scale_fill_cmocean(name = 'haline') +
+  # Labels
+  labs(title = "Phenology of Dinophysis observations",
+       y = "Day of the year",
+       x = 'Sampling site',
+       fill = 'Salinity'
+  ) +
+  # This resets the color scale for fill
+  new_scale_fill() +
+  # Second part of the plot : the violin plot
+  geom_violinhalf(aes(x = Code_point_Libelle, y = Day,
+                      fill = Code_point_Libelle,
+                      color = Code_point_Libelle
+                      ,weight = true_count
+  ),
+  alpha = .4, lwd = .75) +
+  geom_point(data = Max_Dino, aes(x = Code_point_Libelle, y = Day, 
+                                  fill = Code_point_Libelle, size = log_c), 
+             alpha = .4,
+             shape = 21,
+             color = 'black',
+             position = position_jitter(width = .05)) +
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette12, guide = 'none') +
+  scale_size_continuous(guide = 'none') +
+  # this flips the y and x axes so that violin plots are horizontal
+  coord_flip() +
+  # and this ensures that the first (= northernmost) sites are at the top of
+  # the plot
+  scale_x_discrete(limits = rev) +
+  theme(
+    panel.background = element_rect(fill = 'transparent', 
+                                    linewidth = .3, 
+                                    color = 'grey10'),
+    legend.background = element_rect(linewidth = .5, color = 'grey10'),
+    legend.title = element_text(size = 11, color = 'grey5'),
+    legend.frame = element_rect(linewidth = .2, color = 'grey25'),
+    legend.ticks = element_line(linewidth = .2, color = 'grey25'),
+    legend.position = 'bottom'
+  )
+
+# Save that beautiful shit!!!!
+# ggsave('Dinophysis_phenology_half-violin_weighted_salimap.tiff', width = 160, height = 320,
 #        units = 'mm', compression = 'lzw', dpi = 300)
 
 #### Test : Fragilidium ####
