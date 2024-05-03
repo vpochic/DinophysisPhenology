@@ -396,25 +396,8 @@ Season_plot <- Season_plot %>%
                                           'Parc Leucate 2', 'Bouzigues (a)',
                                           'Sète mer', 'Diana centre'))
 
-# Import the hydrological data
-Table_hydro_fortnightly = read.csv2('Table_hydro_fortnightly.csv', header = TRUE,
-                                    fileEncoding = 'ISO-8859-1')
-
-# Create a daily table for plotting the heatmap
-# We create a vector for 'Day of the year'
-Daily_basis <- expand_grid(Day = seq(1,365))
-# And one for 'Fortnight' that matches
-Daily_basis$Fortnight = as.vector(c(rep(1:26, each = 14), 26))
-# We add the site data
-Daily_basis <- expand_grid(Daily_basis,
-                           Code_point_Libelle = unique(Table_hydro_fortnightly$Code_point_Libelle))
-
-# We arrange Daily_basis by Site
-Daily_basis <- Daily_basis %>%
-  group_by(Code_point_Libelle, Day) %>%
-  arrange(Code_point_Libelle)
-
-# Nickel chrome!
+# We alrealdy have tables with hydrology data
+# just need to ensure that we don't include any NA salinity values
 
 Table_hydro_daily <- left_join(Daily_basis, Table_hydro_fortnightly,
                                by = c('Code_point_Libelle', 'Fortnight'),
@@ -432,7 +415,7 @@ Table_hydro_daily <- left_join(Daily_basis, Table_hydro_fortnightly,
 ggplot(data = Season_plot, aes(x = Code_point_Libelle, y = Day)) +
   # First part of the plot : the heatmap of salinity
   geom_tile(data = Table_hydro_daily,
-            aes(x = Code_point_Libelle, y = Day, fill = TEMP.med
+            aes(x = Code_point_Libelle, y = Day, fill = SALI.med
             )) +
   scale_fill_cmocean(name = 'haline') +
   # Labels
