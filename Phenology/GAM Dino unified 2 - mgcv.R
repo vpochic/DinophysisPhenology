@@ -401,27 +401,75 @@ ggplot(gam_Dino_newdata, aes(x = Day, y = fit_resp))+
 ModelOutputs<-data.frame(Fitted=fitted(gam_Dino),
                          Residuals=resid(gam_Dino))
 
-# P3 is residuals vs fitted
-p3<-ggplot(ModelOutputs)+
-  geom_point(aes(x=Fitted,y=Residuals))+
-  theme_classic()+
+# We're gonna make our own qq plot with colors identifying sites
+# We base it on the structure of the model
+qq_data <- gam_Dino$model
+# then we add the values of fitted and residuals 
+# (but are they in the same order as the model? -> need to check that)
+qq_data <- bind_cols(qq_data, ModelOutputs)
+
+# Plot : verify that true data matches (more or less) model fit
+ggplot(qq_data)+
+  geom_point(aes(x = Day, y = true_count), color = 'red') +
+  geom_point(aes(x = Day, y = Fitted), color = 'blue') +
+  facet_wrap(facets = c('Code_point_Libelle')) +
+  theme_classic() +
+  labs(y = "Dinophysis count", x = "Calendar day")
+
+# It matches! great!
+
+# Now for the "official" qq plot, with color of the points depending on site
+# Color palette
+# Blues for Northern Brittany: '#0A1635', '#2B4561'
+# Terra cotta for Pas de Calais: 'sienna4', 'tan3'
+pheno_palette12 <- c('red3', 'orangered', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646',
+                     '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
+
+# We need to reorder the factor 'Code_point_Libelle' so the sites appear in the
+# order we want
+qq_data_reordered <- qq_data %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Parc Leucate 2', 'Bouzigues (a)',
+                                          'Sète mer', 'Diana centre')) %>%
+  # we ungroup the data frame to produce only 1 qq-plot
+  ungroup()
+
+# And (qq-)plot
+qqplot_custom <- ggplot(qq_data_reordered) +
+  stat_qq(aes(sample=Residuals, color = Code_point_Libelle)) +
+  stat_qq_line(aes(sample=Residuals, color = Code_point_Libelle)) +
+  facet_wrap(facets = c('Code_point_Libelle')) +
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  theme_classic() +
+  labs(y="Sample Quantiles",x="Theoretical Quantiles")
+
+qqplot_custom
+
+# We can do the same for residuals vs fitted
+RvFplot_custom <- ggplot(qq_data_reordered)+
+  geom_point(aes(x=Fitted,y=Residuals, color  =Code_point_Libelle))+
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free') +
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  theme_classic() +
   labs(y="Residuals",x="Fitted Values")
 
-# P4 is the qq-plot
-p4<-ggplot(ModelOutputs) +
-  stat_qq(aes(sample=Residuals))+
-  stat_qq_line(aes(sample=Residuals))+
-  theme_classic()+
-  labs(y="Sample Quartiles",x="Theoretical Quartiles")
+RvFplot_custom
 
-p3
-# Resid. vs fitted plot is approximately ok, even if there are some structures
-# due to the weights applied
-p4
-# QQ-plot is quite shit.
+# And let's do one last diagnostic plot with histogram of residuals
+HistRes_custom <- ggplot(qq_data_reordered, aes(x = Residuals, 
+                                                fill = Code_point_Libelle))+
+  geom_histogram(binwidth = 1)+
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free') +
+  scale_fill_discrete(type = pheno_palette12, guide = 'none') +
+  theme_classic() +
+  labs(x='Residuals', y = 'Count')
 
-rm(p3)
-rm(p4)
+HistRes_custom
 
 #### Confidence intervals ####
 
@@ -615,6 +663,10 @@ pheno_palette13 <- c('red3', 'orangered1', 'chocolate4', 'chocolate',
                      'darkorchid4', 'darkorchid1', 'deeppink2'
                      )
 
+# Import 'response_pred_plot' if necessary
+# response_pred_plot <- read.csv2('response_pred_plot_DINO_20240424.csv', 
+#                                 header = TRUE, fileEncoding = 'ISO-8859-1')
+
 # Reordering the factor 'Code_point_Libelle' so that the sites appear in the
 # plot in the desired order
 response_pred_plot <- response_pred_plot %>%
@@ -798,3 +850,68 @@ fitsInSCI <- apply(fits, 2L, inCI, upr = pred$uprS, lwr = pred$lwrS)
 
 sum(fitsInPCI) / length(fitsInPCI)      # Point-wise
 sum(fitsInSCI) / length(fitsInSCI)      # Simultaneous
+
+#### DayF : plotting phenology plots so they start at Day 50 ####
+
+# We create a variable named DayF that is a modified calendar Day :
+# DayF starts at Day 50 where DayF = 1 and ends at Day 49 with DayF = 365
+Season_Dino_DayF <- Season_Dino %>%
+  mutate(DayF = ifelse(# If Day = 50, DayF is set to 1
+    Day == 50, 1,
+    # Else, if Day > 50, DayF is set to Day - 49 (so Day 51 becomes Day 2 etc.)
+    ifelse(Day > 50, Day - 49,
+           # Else (between Day 1 and 49), Day is set to 365-49+Day, so that Day 1 
+           # becomes Day 343, and Day 49 becomes Day 365, and full cycle again
+           365 - 49 + Day)))
+
+# Same with the cropped version of the data
+Season_Dino_DayF_crop <- Season_Dino_crop %>%
+  mutate(DayF = ifelse(# If Day = 50, DayF is set to 1
+    Day == 50, 1,
+    # Else, if Day > 50, DayF is set to Day - 49 (so Day 51 becomes Day 2 etc.)
+    ifelse(Day > 50, Day - 49,
+           # Else (between Day 1 and 49), Day is set to 365-49+Day, so that Day 1 
+           # becomes Day 343, and Day 49 becomes Day 365, and full cycle again
+           365 - 49 + Day)))
+
+# Same for repsonse_pred_plot
+response_pred_plot_DayF <- response_pred_plot %>%
+  mutate(DayF = ifelse(# If Day = 50, DayF is set to 1
+    Day == 50, 1,
+    # Else, if Day > 50, DayF is set to Day - 49 (so Day 51 becomes Day 2 etc.)
+    ifelse(Day > 50, Day - 49,
+           # Else (between Day 1 and 49), Day is set to 365-49+Day, so that Day 1 
+           # becomes Day 343, and Day 49 becomes Day 365, and full cycle again
+           365 - 49 + Day)))
+
+# We need to specify the labels in advance.
+labels_DayF <- c(50, 100, 200, 300, 365)
+
+### Now plot this
+ggplot(response_pred_plot_DayF, aes(x = DayF, y = median.fit, 
+                                    color = Code_point_Libelle,
+                                    fill = Code_point_Libelle)) +
+  geom_ribbon(aes(ymin = lwrS, ymax = uprS), alpha = 0.2) +
+  # geom_path(data = stackFits_response, mapping = aes(y = values_response, x = Day, group= ind),
+  #           alpha = 0.1, colour = "grey20") +
+  geom_line(lwd = 1) +
+  # scale_y_continuous(limits = c(0,40)) +
+  geom_point(data = Season_Dino_DayF_crop, aes(x = DayF, y = true_count), 
+             size = .8, alpha = .5) +
+  labs(y = "Dinophysis cells observed",
+       x = "Day of the year",
+       title = "Poisson GAM of Dinophysis phenology" #,
+       #subtitle = sprintf("Each line is one of %i draws from the Bayesian posterior distribution of the model", nrnd)
+  ) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  # Set the color palette :
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette12, guide = 'none') +
+  # Specifiy for the plot that it needs to plot the right Day (not DayF) as x-axis
+  # labels
+  scale_x_continuous(breaks = c(1, 51, 151, 251, 316), labels = labels_DayF) +
+  theme_classic()
+
+# Saving plot
+# ggsave('gam_Dino_allsites_crop_DayF.tiff', dpi = 300, height = 270, width = 300,
+#        units = 'mm', compression = 'lzw')
