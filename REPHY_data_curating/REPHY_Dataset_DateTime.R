@@ -52,12 +52,15 @@ Table_dates_select <- Table_extractions %>%
   select(c(# Geographical data
     'Code_point_Libelle', 'Longitude', 'Latitude',
     # Time data
-    'DateTime', 'Date', 'Day', 'Month', 'Year', 'Time_hour', 'Time_minute'
+    'DateTime', 'Date', 'Day', 'Month', 'Year', 'Time_hour', 'Time_minute',
+    # Identification code
+    'ID.interne.passage'
     ))
 
 # Here we do a little test: we concatenate 'Code_point_Libelle' (site code) and
 # 'DateTime, and check that the number of UNIQUE values in this column matches
-# the length of the whole dataset.
+# the length of the whole dataset (= number of ID.interne.passage, that are 
+# attributed to each sampling)
 # If true, this means each observation in the dataset corresponds to one 
 # observation in real life (no duplicates)
 # We have to do this procedure because there are genuine duplicates in 
@@ -68,14 +71,14 @@ test <- Table_dates_select %>%
   mutate(test_column = paste(Code_point_Libelle, DateTime, sep = ' '))
 
 length(unique(test$test_column))
-length(Table_dates_select$DateTime)
+length(Table_dates_select$ID.interne.passage)
 # It's alright, we're good
 rm(test)
   
 
 # Write that down WRITE THAT DOWN!
-# write.csv2(Table_dates_select, 'Table_dates_REPHY_select_20240819.csv',
-#            row.names = FALSE)
+write.csv2(Table_dates_select, 'Table_dates_REPHY_select_20240819.csv',
+           row.names = FALSE)
 
 # Make a little sample
 Table_dates_sample <- filter(Table_dates_select,
@@ -86,5 +89,5 @@ Table_dates_sample <- filter(Table_dates_select,
                                Month <= 6)
 
 # Write the sample down in a table
-# write.csv2(Table_dates_sample, 'Table_dates_REPHY_sample_20240819.csv', 
+# write.csv2(Table_dates_sample, 'Table_dates_REPHY_sample_20240819.csv',
 #            row.names = FALSE)
