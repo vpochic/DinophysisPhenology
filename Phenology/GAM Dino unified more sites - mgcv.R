@@ -1,6 +1,6 @@
 ###### GAM for Dinophysis phenology with mgcv - unified 2 ###
 ## V. POCHIC
-# 2024-08-13
+# 2024-08-19
 
 # In this version of the script we add the sites in Pas de Calais 
 # ('Point 1 Boulogne' and 'At so') and in Northern Britanny ('les Hébihens' and 
@@ -49,9 +49,14 @@ Table_phyto_OL <- filter(Table_phyto_taxon, Code_point_Libelle %in%
 # listed as zeros
 Table_Dino_zeros <- Table_phyto_OL %>%
   pivot_wider(names_from = Taxon, values_from = Comptage, values_fill = 0) %>%
-  select(starts_with('Dinophysis') | 
+  # Create Latitude and Longitude variables for selection (because lon and lat
+  # introduce a bunch of unwanted taxa )
+  mutate(Longitude = as.numeric(lon)) %>%
+  mutate(Latitude = as.numeric(lat)) %>%
+  select(starts_with('Dinophysis') |
            contains(c('Code.Region', 'Code_point_Libelle', 'Year', 'Month',
-                      'Date', 'Code.parametre', 'SALI', 'TEMP')))
+                      'Date', 'Heure', 'Code.parametre', 'SALI', 'TEMP', 
+                      'Longitude', 'Latitude', 'ID.interne.passage')))
 
 Table_Dino_zeros <- Table_Dino_zeros %>%
   # Getting rid of some unwelcome guests (who got onboard because the taxon
@@ -59,7 +64,7 @@ Table_Dino_zeros <- Table_Dino_zeros %>%
   select(-(contains('Diplo')))
 
 # Save Table_Dino_zeros so we don't have to re-run the model to plot again
-# write.csv2(Table_Dino_zeros, 'Table_Dino_zeros2.csv', row.names = FALSE,
+# write.csv2(Table_Dino_zeros, 'Table_Dino_zeros3.csv', row.names = FALSE,
 # fileEncoding = "ISO-8859-1")
 
 
@@ -118,6 +123,10 @@ hist(Season_Dino$Day, breaks = 26)
 # (Christmas + NY's eve)
 
 # This seems quite fine!!!
+
+# Let's save that
+# write.csv2(Season_Dino, 'Season_Dino.csv', row.names = FALSE,
+#            fileEncoding = "ISO-8859-1")
 
 #### Where the zeros lie ####
 
