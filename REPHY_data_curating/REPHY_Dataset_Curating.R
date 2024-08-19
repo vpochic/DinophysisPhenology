@@ -1,5 +1,5 @@
 #### Script REPHY : curating data
-# V. POCHIC 2024/01/09
+# V. POCHIC 2024/08/19
 
 # Packages
 
@@ -130,17 +130,20 @@ Table1_phyto_select <- Table1_phyto %>%
 # We're cutting the pipe here so we can create 3 tables: 1 grouped by genus, 1 by class and 1 by taxon
 
 Table1_phyto_genus <- Table1_phyto_select %>%
-  group_by(Code.Region, Code_point_Libelle, lon, lat, Year, Month, Date, Code.parametre, ID.interne.passage, Genus) %>%
+  group_by(Code.Region, Code_point_Libelle, lon, lat, Year, Month, Date, Heure,
+           Code.parametre, ID.interne.passage, Genus) %>%
   summarise(Comptage = sum(Valeur_mesure), .groups = 'keep') #%>%
 # pivot_wider(names_from = Genus, values_from = Valeur_mesure)
 
 Table1_phyto_class <- left_join(Table1_phyto_select, PhyClasse, by = 'Taxon', suffix = c('','')) %>%
-  group_by(Code.Region, Code_point_Libelle, lon, lat, Year, Month, Date, Code.parametre, ID.interne.passage, Phylum.Classe) %>%
+  group_by(Code.Region, Code_point_Libelle, lon, lat, Year, Month, Date, Heure,
+           Code.parametre, ID.interne.passage, Phylum.Classe) %>%
   summarise(Comptage = sum(Valeur_mesure), .groups = 'keep') #%>%
 # pivot_wider(names_from = Phylum.Classe, values_from = Valeur_mesure)
 
 Table1_phyto_taxon <- Table1_phyto_select %>%
-  group_by(Code.Region, Code_point_Libelle, lon, lat, Year, Month, Date, Code.parametre, ID.interne.passage, Taxon) %>%
+  group_by(Code.Region, Code_point_Libelle, lon, lat, Year, Month, Date, Heure,
+           Code.parametre, ID.interne.passage, Taxon) %>%
   summarise(Comptage = sum(Valeur_mesure), .groups = 'keep') #%>%
 
 # write the tables to free some memory space
