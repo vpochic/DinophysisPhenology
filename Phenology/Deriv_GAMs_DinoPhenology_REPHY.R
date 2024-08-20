@@ -1,73 +1,38 @@
 #### Derivatives of fitted GAMs for Dinophysis phenology ##
 ### V. POCHIC
-# 2024-04-24
+# 2024-08-20
 
-# /!\ This script requires data tables generated with the 'GAM Dino unified' 
+# /!\ This script requires data tables generated with the 'GAM Dino unified more sites' 
 # and 'GAM Meso unified' scripts /!\
 
 # The idea behind this is to identify periods of Dinophysis accumulation (deriv-
-# ative > 0) and loss (derivative <0 ) in the different Dinophysis phenologies.
+# ative > 0) and loss (derivative < 0 ) in the different Dinophysis phenologies.
 
 #### Packages and functions ####
 library(tidyverse)
 library(mgcv)
 library(gratia)
 library(ggnewscale)
+library(cmocean)
+library(RColorBrewer)
 
 ### deriv function
 source('derivFun.R')
 #### We'll need the GAM models (obviously) ####
 
-### Import and 'seasonalize' data ####
-# The imported tables come from the GAM scripts (for Dino and Meso phenology
-# GAMs)
+### Import the 'seasonalized' data ####
 
-### Dinophysis
-# The table of Dinophysis counts
-Table_Dino_zeros <- read.csv2('Table_Dino_zeros2.csv', header = TRUE, 
-                              fileEncoding = 'ISO-8859-1',
-                              # ensures that special characters (like +) are not
-                              # changed during import
-                              check.names = FALSE)
+Season_Dino <- read.csv2('Season_Dino.csv', header = TRUE, 
+                         fileEncoding = 'ISO-8859-1')
 
-# Create the seasonality dataset
-Season_Dino <- Table_Dino_zeros %>%
-  # Only FLORTOT
-  filter(Code.parametre == 'FLORTOT') %>%
-  # create a calendar day variable
-  mutate(Day = as.numeric(yday(Date))) %>%
-  mutate(Date = ymd(Date)) %>%
-  #### Note that for the 2 sites in Arcachon, counts are sometimes done in
-  # 100 mL, so we need to filter out those counts
-  # For this, we go and look for any count values IN ANY DINOPHYSIS TAXON that
-  # cannot correspond to 10 mL counts (i.e., not multiples of 100)
-  ### We replace these values with 0. Note that for a given date, we can have
-  # one Dinophysis species counted in 10 mL and another in 100 mL
-  ## That's why we have to proceed taxon by taxon
-  mutate(across(.cols = c('Dinophysis', 'Dinophysis + phalacroma', 'Dinophysis acuta',
-                          'Dinophysis acuminata', 'Dinophysis caudata', 'Dinophysis tripos',
-                          'Dinophysis sacculus', 'Dinophysis fortii',
-                          'Dinophysis hastata + odiosa'), .fns = ~ ifelse(. %% 100 != 0, 0, .))) %>%
-  # And creating some count variables for Dinophysis as a genus
-  mutate(Dinophysis_genus = rowSums(across(contains('Dinophysis')))) %>%
-  # create the log of abundance + 1
-  mutate(log_c = log10(Dinophysis_genus+1)) %>%
-  # create a 'true count' variable
-  # this variable corresponds to the number of cells that were actually
-  # counted by the operator (in 10 mL). This variable will follow a Poisson
-  # distribution, contrary to Dinophysis_genus because the conversion from
-  # 10 mL to 1L (*100) prevents some intermediate values (e.g., 150 cells.L-1)
-  mutate(true_count = Dinophysis_genus/100) %>%
-  # Filter out exceptionnaly high counts (>500 cells observed in 10 mL)
-  # this represents 3 events (2 in Antifer and 1 in Cabourg)
-  filter(true_count < 500) %>%
-  # converting the site to factor for the model
+# The sites must be entered as factors
+Season_Dino <- Season_Dino %>%
   mutate(Code_point_Libelle = as.factor(Code_point_Libelle))
 
 # Alright!
 
 ### Mesodinium
-# The table of Dinophysis counts
+# The table of Mesodinium counts
 Table_Meso_zeros <- read.csv2('Table_Meso_zeros.csv', header = TRUE, 
                               fileEncoding = 'ISO-8859-1',
                               # ensures that special characters (like +) are not
@@ -129,8 +94,74 @@ gam_Dino <- gam(data = Season_Dino,
                 # Restricted maximum likelihood estimation (recommended method)
                 method = 'REML')
 
-summary(gam_Dino)
-gam.check(gam_Dino)
+# We can have a look at the diagnostic plots to be sure it worked as intended
+# Model outputs
+ModelOutputs<-data.frame(Fitted=fitted(gam_Dino),
+                         Residuals=resid(gam_Dino))
+
+# We're gonna make our own qq plot with colors identifying sites
+# We base it on the structure of the model
+qq_data <- gam_Dino$model
+# then we add the values of fitted and residuals 
+# (they are in the same order as in the model)
+qq_data <- bind_cols(qq_data, ModelOutputs)
+
+qq_data_reordered <- qq_data %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Parc Leucate 2', 'Bouzigues (a)',
+                                          'Sète mer', 'Diana centre')) %>%
+  # we ungroup the data frame to produce only 1 qq-plot
+  ungroup()
+
+# color palette for 16 sites
+pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646',
+                     '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
+
+# And (qq-)plot
+qqplot_custom <- ggplot(qq_data_reordered) +
+  stat_qq(aes(sample=Residuals, color = Code_point_Libelle), alpha = .7) +
+  stat_qq_line(aes(sample=Residuals, color = Code_point_Libelle)) +
+  facet_wrap(facets = c('Code_point_Libelle')) +
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  theme_classic() +
+  labs(y="Sample Quantiles",x="Theoretical Quantiles")
+
+qqplot_custom
+
+# We can do the same for residuals vs fitted
+RvFplot_custom <- ggplot(qq_data_reordered)+
+  geom_point(aes(x=Fitted,y=Residuals, color  =Code_point_Libelle), 
+             alpha = .7) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free') +
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  theme_classic() +
+  labs(y="Residuals",x="Fitted Values")
+
+RvFplot_custom
+
+# And let's do one last diagnostic plot with histogram of residuals
+HistRes_custom <- ggplot(qq_data_reordered, aes(x = Residuals, 
+                                                fill = Code_point_Libelle))+
+  geom_histogram(binwidth = 1)+
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free') +
+  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
+  theme_classic() +
+  labs(x='Residuals', y = 'Count')
+
+HistRes_custom
+
+# Remove all the diagnostic plots
+rm(HistRes_custom)
+rm(RvFplot_custom)
+rm(qqplot_custom)
 
 ### Mesodinium
 Season_Meso <- filter(Season_Meso, Code_point_Libelle != 'Parc Leucate 2'
@@ -210,16 +241,18 @@ gam_Dino.d <- derivatives(# The object of which we want to calculate derivatives
 ### Plotting
 
 # Aesthetics
-# Nice color palette
-pheno_palette12 <- c('red3', 'orangered1', 'dodgerblue4', 'dodgerblue1', 
-                     'chartreuse4', 'chartreuse2','goldenrod3', 'darkgoldenrod1',
-                     'darkorchid4', 'darkorchid1', 'firebrick1', 'deeppink2'
-)
+# Nice color palette with 16 colors
+pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646',
+                     '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
 
 # Relevel factors so we have sampling sites in the desired order
 gam_Dino.d <- gam_Dino.d %>%
   mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
                                           'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
                                           'Men er Roue', 'Ouest Loscolo',
                                           'Le Cornard', 'Auger',
                                           'Arcachon - Bouée 7', 'Teychan bis',
@@ -242,15 +275,60 @@ ggplot(gam_Dino.d, aes(x = data, y = derivative,
   ) +
   facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
   # Set the color palette :
-  scale_color_discrete(type = pheno_palette12, guide = 'none') +
-  scale_fill_discrete(type = pheno_palette12, guide = 'none') +
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
   theme_classic()
 
 # That seems to work nicely
 
 # Saving plot
-# ggsave('DinoDeriv_12sites_phenology.tiff', dpi = 300, height = 225, width = 300,
+# ggsave('DinoDeriv_16sites_phenology.tiff', dpi = 300, height = 225, width = 300,
 #        units = 'mm', compression = 'lzw')
+
+### We can also do that with only the sites we will analyse further
+gam_Dino.d_select <- gam_Dino.d %>%
+  # filter
+  filter(Code_point_Libelle %in% c('Point 1 Boulogne', 'At so',
+                                   'Antifer ponton pétrolier', 'Cabourg',
+                                   'les Hébihens', 'Loguivy',
+                                   'Men er Roue', 'Ouest Loscolo',
+                                   'Le Cornard', 'Auger',
+                                   'Arcachon - Bouée 7', 'Teychan bis')) %>%
+  # and relevel
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis'))
+
+# New color palette needed
+pheno_palette12 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646')
+
+# Select plot
+ggplot(gam_Dino.d_select, aes(x = data, y = derivative, 
+                       color = Code_point_Libelle,
+                       fill = Code_point_Libelle)) +
+  # Confidence interval
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
+  # Derivative fit
+  geom_path(lwd = 1) +
+  # Draw a line at 0 to separate accumulation from loss
+  geom_line(aes(x = data, y = 0), color = 'grey10', linewidth = .7) +
+  labs(y = "1st derivative of Dinophysis GAM",
+       x = "Day of the year",
+       title = "1st derivative of Dinophysis GAM"
+  ) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y',
+             # 4 rows to highlight the latitudinal change in phenology
+             nrow = 4) +
+  # Set the color palette :
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette12, guide = 'none') +
+  theme_classic()
 
 #### Annotating the derivatives ####
 ### We can assign ecological meaning to the derivatives
@@ -466,7 +544,7 @@ ggplot(combined_plot) +
   geom_ribbon(aes(x = Day,
                   ymin = lwrS, ymax = uprS,
                   color = Code_point_Libelle,
-                  fill = Code_point_Libelle), alpha = 0.2) +
+                  fill = Code_point_Libelle), alpha = 0.1) +
   # geom_path(data = stackFits_response, mapping = aes(y = values_response, x = Day, group= ind),
   #           alpha = 0.1, colour = "grey20") +
   geom_path(aes(x = Day, y = median.fit,
@@ -652,4 +730,156 @@ ggplot(select_plot) +
 
 # Saving plot
 # ggsave('Meso_and_DinoDeriv_4sites_discrete.tiff', dpi = 300, height = 170, width = 160,
+#        units = 'mm', compression = 'lzw')
+
+#### Rugplot of environmental variables under the Dino derivative plot ####
+### Import data for environmental variables ####
+Table_hydro_fortnightly <- read.csv2('Table_hydro_fortnightly_20240820.csv', 
+                                     header = TRUE,
+                                     fileEncoding = 'ISO-8859-1')
+
+# Create a daily table for plotting the rugplot
+# We create a vector for 'Day of the year'
+Daily_basis <- expand_grid(Day = seq(1,365))
+# And one for 'Fortnight' that matches
+Daily_basis$Fortnight = as.vector(c(rep(1:26, each = 14), 26))
+# We add the site data
+Daily_basis <- expand_grid(Daily_basis,
+                           Code_point_Libelle = unique(Table_hydro_fortnightly$Code_point_Libelle))
+
+# We arrange Daily_basis by Site
+Daily_basis <- Daily_basis %>%
+  group_by(Code_point_Libelle, Day) %>%
+  arrange(Code_point_Libelle)
+
+# Nickel chrome!
+
+Table_hydro_daily <- left_join(Daily_basis, Table_hydro_fortnightly,
+                               by = c('Code_point_Libelle', 'Fortnight'),
+                               suffix  = c('','')) %>%
+  filter(is.na(TEMP.med) == FALSE) %>%
+  mutate(Code_point_Libelle = as.factor(Code_point_Libelle)) %>%
+  group_by(Day, Code_point_Libelle)
+
+# Let's save this hydrology table for later
+# write.csv2(Table_hydro_daily, 'Table_hydro_daily_20240820.csv', row.names = FALSE,
+#            fileEncoding = 'ISO-8859-1')
+
+### Plotting ####
+
+# We want to plot the Dino derivative with the temperature as rugplot
+# A nice plot
+ggplot(gam_Dino.d_select) +
+  # First part of the plot: the rug plot
+  # We use a color palette from the RColorBrewer package
+  scale_color_distiller(palette = 'RdBu', direction = -1) +
+  geom_rug(data = Table_hydro_daily, aes(x = Day, color = TEMP.med),
+           linewidth = .3,
+           length = unit(0.5, 'cm')
+  ) +
+  # Labels
+  labs(y = "1st derivative of Dinophysis GAM",
+       x = "Day of the year",
+       title = '1st derivative of Dinophysis GAM',
+       color = c(expression(paste('Sea surface temperature (°C)')))
+  ) +
+  # Change the color scale
+  new_scale_color() +
+  # Second part of plot: GAM derivatives
+  # Confidence interval
+  geom_ribbon(aes(x = data, ymin = lower, ymax = upper,
+                  color = Code_point_Libelle,
+                  fill = Code_point_Libelle), alpha = 0.2) +
+  # Derivative fit
+  geom_path(aes(x = data, y = derivative, 
+                  color = Code_point_Libelle), lwd = 1) +
+  # Draw a line at 0 to separate accumulation from loss
+  geom_line(aes(x = data, y = 0), color = 'grey10', linewidth = .7) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  # Set the color palette :
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
+  # Theme
+  theme(plot.title = element_text(size = 11), 
+        # Axis
+        axis.title.x = element_text(size=10), 
+        axis.title.y =element_text(size=10), 
+        axis.text = element_text(size=8, color = 'black'),
+        axis.line.x = element_line(linewidth = .2, color = 'black'),
+        axis.line.y = element_line(linewidth = .2, color = 'black'),
+        # Legend
+        legend.background = element_rect(linewidth = .5, color = 'grey10'),
+        legend.title = element_text(size = 10, color = 'grey5'),
+        legend.frame = element_rect(linewidth = .5, color = 'grey10'),
+        legend.ticks = element_line(linewidth = .2, color = 'grey25'),
+        legend.position = 'bottom',
+        # Panel
+        panel.grid = element_blank(),
+        panel.background = element_blank(),
+        # Facet labels
+        strip.background = element_rect(fill = 'transparent',
+                                        linewidth = 1,
+                                        color = 'grey10'),
+        strip.text = element_text(color = 'grey5', size = 7.5))
+
+# Saving the temperature plot
+# ggsave('Dinoderiv_temperature_12sites_large.tiff', dpi = 300, height = 200, width = 250,
+#        units = 'mm', compression = 'lzw')
+
+# Now with salinity
+ggplot(gam_Dino.d_select) +
+  # First part of the plot: the rug plot
+  # We use a color palette from the cmocean package
+  scale_color_cmocean(name = 'haline') +
+  geom_rug(data = Table_hydro_daily, aes(x = Day, color = SALI.med),
+           linewidth = .3,
+           length = unit(0.5, 'cm')
+  ) +
+  # Labels
+  labs(y = "1st derivative of Dinophysis GAM",
+       x = "Day of the year",
+       title = '1st derivative of Dinophysis GAM',
+       color = c(expression(paste('Sea surface salinity (PSU)')))
+  ) +
+  # Change the color scale
+  new_scale_color() +
+  # Second part of plot: GAM derivatives
+  # Confidence interval
+  geom_ribbon(aes(x = data, ymin = lower, ymax = upper,
+                  color = Code_point_Libelle,
+                  fill = Code_point_Libelle), alpha = 0.2) +
+  # Derivative fit
+  geom_path(aes(x = data, y = derivative, 
+                color = Code_point_Libelle), lwd = 1) +
+  # Draw a line at 0 to separate accumulation from loss
+  geom_line(aes(x = data, y = 0), color = 'grey10', linewidth = .7) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  # Set the color palette :
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
+  # Theme
+  theme(plot.title = element_text(size = 11), 
+        # Axis
+        axis.title.x = element_text(size=10), 
+        axis.title.y =element_text(size=10), 
+        axis.text = element_text(size=8, color = 'black'),
+        axis.line.x = element_line(linewidth = .2, color = 'black'),
+        axis.line.y = element_line(linewidth = .2, color = 'black'),
+        # Legend
+        legend.background = element_rect(linewidth = .5, color = 'grey10'),
+        legend.title = element_text(size = 10, color = 'grey5'),
+        legend.frame = element_rect(linewidth = .5, color = 'grey10'),
+        legend.ticks = element_line(linewidth = .2, color = 'grey25'),
+        legend.position = 'bottom',
+        # Panel
+        panel.grid = element_blank(),
+        panel.background = element_blank(),
+        # Facet labels
+        strip.background = element_rect(fill = 'transparent',
+                                        linewidth = 1,
+                                        color = 'grey10'),
+        strip.text = element_text(color = 'grey5', size = 7.5))
+
+# Saving the temperature plot
+# ggsave('Dinoderiv_salinity_12sites_large.tiff', dpi = 300, height = 200, width = 250,
 #        units = 'mm', compression = 'lzw')

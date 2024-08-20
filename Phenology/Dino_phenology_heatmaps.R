@@ -1,6 +1,8 @@
 #### Temperature and salinity heatmaps for Dinophysis phenology ##
 ## V. POCHIC
-# 2024/04/30
+# 2024/08/20
+# --> Now with only the sites selected for phenology analysis
+# (The Channel-Atlantic coast)
 
 ### Packages ####
 
@@ -14,17 +16,18 @@ Table_hydro <- read.csv2('Table1_hydro_select.csv', header = TRUE, fileEncoding 
 
 # Select only stations of interest from 2007 --> 2022
 Table_hydro_select <- filter(Table_hydro, Code_point_Libelle %in% 
-                               c(# Baie de Seine
+                               c(# Pas de Calais
+                                 'Point 1 Boulogne', 'At so',
+                                 # Baie de Seine
                                  'Antifer ponton pétrolier', 'Cabourg',
+                                 # Bretagne Nord
+                                 'les Hébihens', 'Loguivy',
                                  # Bretagne Sud
                                  'Men er Roue', 'Ouest Loscolo',
                                  # Pertuis charentais
                                  'Auger', 'Le Cornard',
                                  # Arcachon
-                                 'Arcachon - Bouée 7', 'Teychan bis',
-                                 # Mediterranée
-                                 'Parc Leucate 2', 'Bouzigues (a)', 'Sète mer',
-                                 'Diana centre')
+                                 'Arcachon - Bouée 7', 'Teychan bis')
 ) %>%
   # Only after 2007
   filter(Year >= 2007) %>%
@@ -172,6 +175,137 @@ ggplot(Table_hydro_select) +
 # ggsave('SSS_12sites_Dinophenology.tiff', dpi = 300, width = 300, height = 200,
 #        units = 'mm', compression = 'lzw')
 
+##### Plotting Chl a ####
+
+### We make another table for chl a
+Table_chla_select <- filter(Table_hydro, Code_point_Libelle %in% 
+                               c(# Baie de Seine
+                                 'Antifer ponton pétrolier', 'Cabourg',
+                                 # Bretagne Sud
+                                 'Men er Roue', 'Ouest Loscolo',
+                                 # Pertuis charentais
+                                 'Auger', 'Le Cornard',
+                                 # Arcachon
+                                 'Arcachon - Bouée 7', 'Teychan bis',
+                                 # Mediterranée
+                                 'Parc Leucate 2', 'Bouzigues (a)', 'Sète mer',
+                                 'Diana centre')
+) %>%
+  # Only after 2007
+  filter(Year >= 2007) %>%
+  # Only events for which Chl a was properly recorded
+  filter(is.na(CHLOROA) == FALSE) %>%
+  filter(CHLOROA > 0) %>%
+  # Change to date format
+  mutate(Date = ymd(Date)) %>%
+  mutate(Month = month(Date)) %>%
+  # Create a 'fortnight' variable to match the sampling frequency
+  mutate(Week = week(Date)) %>%
+  mutate(Fortnight = ceiling(Week/2))
+
+### Now let's plot !
+
+# First, reorder the factor so that sampling sites appear in the desired order
+Table_chla_select <- Table_chla_select %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Parc Leucate 2', 'Bouzigues (a)',
+                                          'Sète mer', 'Diana centre'))
+
+# Plot aesthetics
+pheno_palette12 <- c('red3', 'orangered1', 'dodgerblue4', 'dodgerblue1', 
+                     'chartreuse4', 'chartreuse2','goldenrod3', 'darkgoldenrod1',
+                     'darkorchid4', 'darkorchid1', 'firebrick1', 'deeppink2'
+)
+
+# Little plot
+ggplot(Table_chla_select, aes(x = Date, y = CHLOROA, color = Code_point_Libelle)) +
+  geom_point()  +
+  scale_color_discrete(type = pheno_palette12) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y')
+
+# Everything's fine
+# Now let's plot that as a heatmap
+
+ggplot(Table_chla_select, aes(x = Date, y = 1, fill = CHLOROA)) +
+  geom_tile()  +
+  facet_wrap(facets = c('Code_point_Libelle'))
+# Strange
+
+# As dot plot by fortnight
+ggplot(Table_chla_select, aes(x = Fortnight,
+                              # Convert chl a to log scale 
+                              # (dealing with extreme values)
+                              y = log10(CHLOROA), 
+                              color = Code_point_Libelle)) +
+  geom_point()  +
+  scale_color_discrete(type = pheno_palette12) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y')
+
+# As box plot by fortnight
+ggplot(Table_chla_select) +
+  geom_boxplot(aes(x = factor(Fortnight),
+                   # Convert chl a to log scale 
+                   # (dealing with extreme values)
+                   y = log10(CHLOROA), 
+                   color = Code_point_Libelle))  +
+  geom_point(aes(x = Fortnight, y = log10(CHLOROA), color = Code_point_Libelle),
+             alpha = .25)  +
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  # Labels
+  labs(title = c(expression(paste('Chl ', italic('a')))),
+       y = c(expression(paste('log[Chl ', italic('a'),' concentration]'))),
+       x = 'Fortnight',
+       color = 'Sampling site'
+  ) +
+  # Divide this in little plots for each sampling site
+  facet_wrap(facets = c('Code_point_Libelle')) +
+  theme(
+    panel.background = element_rect(fill = 'transparent', 
+                                    linewidth = .3, 
+                                    color = 'grey10'),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(linewidth = .2, color = 'grey60'),
+    panel.grid.minor.y = element_line(linewidth = .1, color = 'grey60'),
+    axis.text.x = element_text(size = 5)
+  )
+
+# As box plot by fortnight but with real values (not log-transformed)
+ggplot(Table_chla_select) +
+  geom_boxplot(aes(x = factor(Fortnight),
+                   y = CHLOROA, 
+                   color = Code_point_Libelle),
+               outliers = FALSE)  +
+  # geom_point(aes(x = Fortnight, y = CHLOROA, color = Code_point_Libelle),
+  #            alpha = .25)  +
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  # Labels
+  labs(title = c(expression(paste('Chl ', italic('a')))),
+       y = c(expression(paste('Chl ', italic('a'),' concentration (mg.L'^'-1',')'))),
+       x = 'Fortnight',
+       color = 'Sampling site'
+  ) +
+  # Scale y axis
+  # scale_y_continuous(limits = c(0,30)) +
+  # Divide this in little plots for each sampling site
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  theme(
+    panel.background = element_rect(fill = 'transparent', 
+                                    linewidth = .3, 
+                                    color = 'grey10'),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(linewidth = .2, color = 'grey60'),
+    panel.grid.minor.y = element_line(linewidth = .1, color = 'grey60'),
+    axis.text.x = element_text(size = 5)
+  )
+
+# Save this really nice plot
+# ggsave('Chla_12sites_Dinophenology.tiff', dpi = 300, width = 300, height = 200,
+#        units = 'mm', compression = 'lzw')
+
 ### Summarising by month ####
 
 Table_hydro_monthly <- Table_hydro_select %>%
@@ -208,7 +342,7 @@ Table_hydro_fortnightly <- Table_hydro_select %>%
   filter(Fortnight < 27)
 
 # Write that down!
-# write.csv2(Table_hydro_fortnightly, 'Table_hydro_fortnightly.csv',
+# write.csv2(Table_hydro_fortnightly, 'Table_hydro_fortnightly_20240820.csv',
 #            row.names = FALSE, fileEncoding = "ISO-8859-1")
 
 # Now let's plot that as a heatmap
