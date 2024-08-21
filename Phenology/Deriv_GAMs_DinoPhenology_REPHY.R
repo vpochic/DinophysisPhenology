@@ -1,9 +1,9 @@
 #### Derivatives of fitted GAMs for Dinophysis phenology ##
 ### V. POCHIC
-# 2024-08-20
+# 2024-08-21
 
 # /!\ This script requires data tables generated with the 'GAM Dino unified more sites' 
-# and 'GAM Meso unified' scripts /!\
+# and 'GAM Meso unified' AND Dino_phenology_heatmaps scripts /!\
 
 # The idea behind this is to identify periods of Dinophysis accumulation (deriv-
 # ative > 0) and loss (derivative < 0 ) in the different Dinophysis phenologies.
@@ -734,7 +734,7 @@ ggplot(select_plot) +
 
 #### Rugplot of environmental variables under the Dino derivative plot ####
 ### Import data for environmental variables ####
-Table_hydro_fortnightly <- read.csv2('Table_hydro_fortnightly_20240820.csv', 
+Table_hydro_fortnightly <- read.csv2('Table_hydro_fortnightly_20240821.csv', 
                                      header = TRUE,
                                      fileEncoding = 'ISO-8859-1')
 
@@ -762,7 +762,7 @@ Table_hydro_daily <- left_join(Daily_basis, Table_hydro_fortnightly,
   group_by(Day, Code_point_Libelle)
 
 # Let's save this hydrology table for later
-# write.csv2(Table_hydro_daily, 'Table_hydro_daily_20240820.csv', row.names = FALSE,
+# write.csv2(Table_hydro_daily, 'Table_hydro_daily_20240821.csv', row.names = FALSE,
 #            fileEncoding = 'ISO-8859-1')
 
 ### Plotting ####
@@ -795,7 +795,7 @@ ggplot(gam_Dino.d_select) +
                   color = Code_point_Libelle), lwd = 1) +
   # Draw a line at 0 to separate accumulation from loss
   geom_line(aes(x = data, y = 0), color = 'grey10', linewidth = .7) +
-  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  facet_wrap(facets = c('Code_point_Libelle')) + #, scales = 'free_y'
   # Set the color palette :
   scale_color_discrete(type = pheno_palette16, guide = 'none') +
   scale_fill_discrete(type = pheno_palette16, guide = 'none') +
@@ -853,7 +853,7 @@ ggplot(gam_Dino.d_select) +
                 color = Code_point_Libelle), lwd = 1) +
   # Draw a line at 0 to separate accumulation from loss
   geom_line(aes(x = data, y = 0), color = 'grey10', linewidth = .7) +
-  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  facet_wrap(facets = c('Code_point_Libelle')) + # , scales = 'free_y'
   # Set the color palette :
   scale_color_discrete(type = pheno_palette16, guide = 'none') +
   scale_fill_discrete(type = pheno_palette16, guide = 'none') +
@@ -882,4 +882,63 @@ ggplot(gam_Dino.d_select) +
 
 # Saving the temperature plot
 # ggsave('Dinoderiv_salinity_12sites_large.tiff', dpi = 300, height = 200, width = 250,
+#        units = 'mm', compression = 'lzw')
+
+# Now with salinity
+ggplot(gam_Dino.d_select) +
+  # First part of the plot: the rug plot
+  # We use a color palette from the cmocean package
+  scale_color_cmocean(name = 'algae') +
+  geom_rug(data = Table_hydro_daily, aes(x = Day, color = CHLOROA.med),
+           linewidth = .3,
+           length = unit(0.5, 'cm')
+  ) +
+  # Labels
+  labs(y = "1st derivative of Dinophysis GAM",
+       x = "Day of the year",
+       title = '1st derivative of Dinophysis GAM',
+       color = c(expression(paste('Chlorophyll ',italic('a'),
+                                  ' concentration (mg.m'^'3',')')))
+  ) +
+  # Change the color scale
+  new_scale_color() +
+  # Second part of plot: GAM derivatives
+  # Confidence interval
+  geom_ribbon(aes(x = data, ymin = lower, ymax = upper,
+                  color = Code_point_Libelle,
+                  fill = Code_point_Libelle), alpha = 0.2) +
+  # Derivative fit
+  geom_path(aes(x = data, y = derivative, 
+                color = Code_point_Libelle), lwd = 1) +
+  # Draw a line at 0 to separate accumulation from loss
+  geom_line(aes(x = data, y = 0), color = 'grey10', linewidth = .7) +
+  facet_wrap(facets = c('Code_point_Libelle')) + # , scales = 'free_y'
+  # Set the color palette :
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
+  # Theme
+  theme(plot.title = element_text(size = 11), 
+        # Axis
+        axis.title.x = element_text(size=10), 
+        axis.title.y =element_text(size=10), 
+        axis.text = element_text(size=8, color = 'black'),
+        axis.line.x = element_line(linewidth = .2, color = 'black'),
+        axis.line.y = element_line(linewidth = .2, color = 'black'),
+        # Legend
+        legend.background = element_rect(linewidth = .5, color = 'grey10'),
+        legend.title = element_text(size = 10, color = 'grey5'),
+        legend.frame = element_rect(linewidth = .5, color = 'grey10'),
+        legend.ticks = element_line(linewidth = .2, color = 'grey25'),
+        legend.position = 'bottom',
+        # Panel
+        panel.grid = element_blank(),
+        panel.background = element_blank(),
+        # Facet labels
+        strip.background = element_rect(fill = 'transparent',
+                                        linewidth = 1,
+                                        color = 'grey10'),
+        strip.text = element_text(color = 'grey5', size = 7.5))
+
+# Saving the temperature plot
+# ggsave('Dinoderiv_chloroa_12sites_large.tiff', dpi = 300, height = 200, width = 250,
 #        units = 'mm', compression = 'lzw')
