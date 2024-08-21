@@ -1,8 +1,8 @@
 #### Temperature and salinity heatmaps for Dinophysis phenology ##
 ## V. POCHIC
-# 2024/08/20
+# 2024/08/21
 # --> Now with only the sites selected for phenology analysis
-# (The Channel-Atlantic coast)
+# (The Channel-Atlantic coast) and with Chl a
 
 ### Packages ####
 
@@ -10,6 +10,7 @@ library(tidyverse)
 library(viridis)
 library(paletteer)
 library(RColorBrewer)
+library(cmocean)
 
 ### Import data ####
 Table_hydro <- read.csv2('Table1_hydro_select.csv', header = TRUE, fileEncoding = "ISO-8859-1")
@@ -336,13 +337,16 @@ Table_hydro_fortnightly <- Table_hydro_select %>%
     TEMP.med = median(TEMP), TEMP.mean = mean(TEMP),
     # Salinity
     SALI.med = median(SALI), SALI.mean = mean(SALI),
-    .groups = 'keep') %>%
+  # Chlorophyll a, ignore NAs
+  CHLOROA.med = median(CHLOROA, na.rm = TRUE), 
+  CHLOROA.mean = mean(CHLOROA, na.rm = TRUE),
+  .groups = 'keep') %>%
   # filter out Fortnight 27 as there isn't enough measurements to calculate
   # a reliable median
   filter(Fortnight < 27)
 
 # Write that down!
-# write.csv2(Table_hydro_fortnightly, 'Table_hydro_fortnightly_20240820.csv',
+# write.csv2(Table_hydro_fortnightly, 'Table_hydro_fortnightly_20240821.csv',
 #            row.names = FALSE, fileEncoding = "ISO-8859-1")
 
 # Now let's plot that as a heatmap
@@ -367,4 +371,15 @@ ggplot(Table_hydro_fortnightly, aes(x = Fortnight, y = 1, fill = SALI.med)) +
 ggplot(Table_hydro_fortnightly, aes(x = Fortnight, y = 1, fill = SALI.mean)) +
   geom_tile()  +
   scale_fill_cmocean(name = 'haline') +
+  facet_wrap(facets = c('Code_point_Libelle'))
+
+# Salinity
+ggplot(Table_hydro_fortnightly, aes(x = Fortnight, y = 1, fill = CHLOROA.med)) +
+  geom_tile()  +
+  scale_fill_cmocean(name = 'algae') +
+  facet_wrap(facets = c('Code_point_Libelle'))
+
+ggplot(Table_hydro_fortnightly, aes(x = Fortnight, y = 1, fill = CHLOROA.mean)) +
+  geom_tile()  +
+  scale_fill_cmocean(name = 'algae') +
   facet_wrap(facets = c('Code_point_Libelle'))
