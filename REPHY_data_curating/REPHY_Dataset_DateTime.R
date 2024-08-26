@@ -15,7 +15,7 @@ library(vegan)
 # Import the table corresponding to DinoZeros 
 # (table of all Dinophysis counts including zeros, in the 16 sites)
 Season_Dino <- read.csv2('Season_Dino.csv', header = TRUE, 
-                         fileEncoding = "ISO-8859-1")
+                         fileEncoding = 'ISO-8859-1')
 
 #### Curate data (mainly to give an appropriate time format) ####
 
@@ -91,3 +91,67 @@ Table_dates_sample <- filter(Table_dates_select,
 # Write the sample down in a table
 # write.csv2(Table_dates_sample, 'Table_dates_REPHY_sample_20240819.csv',
 #            row.names = FALSE)
+
+#### A hydrology table for checking model results ####
+
+# Import the hydrology table (with all depth levels measured)
+Table_hydro <- read.csv2('Table1_hydro_models.csv', header = TRUE,
+                         fileEncoding = 'ISO-8859-1') %>%
+  # Filter to only keep the interesting sites
+  filter(Code_point_Libelle %in% 
+           c(# Pas de Calais
+             'Point 1 Boulogne', 'At so',
+             # Baie de Seine
+             'Antifer ponton pétrolier', 'Cabourg',
+             # Bretagne Nord
+             'les Hébihens', 'Loguivy',
+             # Bretagne Sud
+             'Men er Roue', 'Ouest Loscolo',
+             # Pertuis charentais
+             'Auger', 'Le Cornard',
+             # Arcachon
+             'Arcachon - Bouée 7', 'Teychan bis')
+  ) %>%
+  # Only after 2007
+  filter(Year >= 2007) %>%
+  # Rename lon and lat into Longitude and Latitude, and Heure into Hour
+  rename(Longitude = lon, Latitude = lat, Hour = Heure) %>%
+  ### Date and Time changes
+  # Compute the date
+  mutate(Date = ymd(Date)) %>%
+  # Convert date back to character for date and time concatenation
+  mutate(Date = as.character(Date)) %>%
+  # Concatenate Date and Heure to have an "unambiguous" format
+  mutate(DateTime = paste(Date, Hour, sep = ' ')) %>%
+  mutate(DateTime = ymd_hms(DateTime)) %>%
+  # A warning followed by a little inspection tells us there are 2
+  # events with no hour indicated. They are discarded at this point.
+  filter(is.na(DateTime) == FALSE) %>%
+  # Convert Date back to date format
+  mutate(Date = ymd(Date)) %>%
+  # Create Year, Month, Hour and Minute variables
+  mutate(Day = day(Date)) %>%
+  mutate(Month = month(Date, label = F)) %>%
+  mutate(Year = year(Date)) %>%
+  # Compute the hour and minutes
+  mutate(Time_hour = hour(DateTime)) %>%
+  mutate(Time_minute = minute(DateTime)) %>%
+  filter(!is.na(Year)) %>%
+  # Only events for which Temperature and Salinity were properly recorded
+  filter(is.na(TEMP) == FALSE) %>%
+  filter(is.na(SALI) == FALSE) %>%
+  # Select some columns
+  select(2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,47,
+         52,53,54,55)
+
+# check the number of unique IDs (ID.interne.prelevement)
+length(unique(Table_hydro$ID.interne.prelevement))
+# It's equal to the number of rows in the table: hurray!
+
+# Write the table down and send it to the modellers!
+# write.csv2(Table_hydro, 'Table_hydro_REPHY_multidepth_20240826.csv', row.names = FALSE)
+
+# Note : the number of unique IDs in this table is smaller than in the first one
+# because it doesn't include the Mediterranean sites.
+# When they are excluded, the table with only surface measurements is indeed
+# smaller (4209 unique IDs)

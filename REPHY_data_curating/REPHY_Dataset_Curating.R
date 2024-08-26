@@ -1,7 +1,7 @@
 #### Script REPHY : curating data
-# V. POCHIC 2024/08/19
+# V. POCHIC 2024/08/26
 
-# Packages
+### Required packages ####
 
 library(tidyverse)
 library(stringr)
@@ -155,9 +155,10 @@ Table1_phyto_taxon <- Table1_phyto_select %>%
 # Spread the hydrology measurements
 
 Table1_hydro_select <- Table1_hydro %>%
-  select(c('ID.interne.passage', 'Qualite.resultat', 'Code.parametre', 'Valeur_mesure', 'Prelevement.niveau',
-           'Code.Region', 'Region', 'Date', 'Day', 'Month', 'Year', 'Code_point_Libelle', 
-           'Code_point_Mnemonique', 'lon', 'lat')) %>%
+  select(c('ID.interne.passage', 'Qualite.resultat', 'Code.parametre', 'Valeur_mesure', 
+           'Prelevement.niveau','Profondeur.metre', 'Code.Region', 'Region', 'Date', 'Day',
+           'Month', 'Year', 'Heure', 'Code_point_Libelle', 'Code_point_Mnemonique',
+           'lon', 'lat')) %>%
   #filter(Code_point_Libelle == 'Ouest Loscolo')
   #filter out Code.Region = 0 (only a few mysterious events in 2011-2013)
   filter(Code.Region != 0) %>%
@@ -171,7 +172,28 @@ Table1_hydro_select <- Table1_hydro %>%
   pivot_wider(names_from = Code.parametre, values_from = Valeur_mesure)
 
 # write the table to free some memory space
-write.csv2(Table1_hydro_select, 'Table1_hydro_select.csv', row.names = FALSE, fileEncoding = "ISO-8859-1")
+# write.csv2(Table1_hydro_select, 'Table1_hydro_select.csv', row.names = FALSE, fileEncoding = "ISO-8859-1")
+
+### An additional line for checking model performance on temperature and salinity
+# We keep all sampling levels to gather maximum info on T and S at several depths
+Table1_hydro_models <- Table1_hydro %>%
+  select(c('ID.interne.passage', 'ID.interne.prelevement',
+           'Qualite.resultat', 'Code.parametre', 'Valeur_mesure', 'Prelevement.niveau',
+           'Profondeur.metre', 'Code.Region', 'Region', 'Date', 'Day', 'Month', 'Year', 'Heure',
+           'Code_point_Libelle', 'Code_point_Mnemonique', 'lon', 'lat')) %>%
+  #filter(Code_point_Libelle == 'Ouest Loscolo')
+  #filter out Code.Region = 0 (only a few mysterious events in 2011-2013)
+  filter(Code.Region != 0) %>%
+  group_by(Code.Region, Code_point_Libelle, lon, lat, Year, Month, Date, Heure,
+           ID.interne.passage, ID.interne.prelevement, 
+           Code.parametre, Prelevement.niveau, Profondeur.metre) %>%
+  # There is probably something shifty here, regarding multiple CHLOROA measurements at certain stations,
+  # made with different methods. For now we average everything but this is quite bad.
+  summarise(Valeur_mesure = mean(Valeur_mesure), .groups = 'keep') %>%
+  pivot_wider(names_from = Code.parametre, values_from = Valeur_mesure)
+
+# write the table to free some memory space
+# write.csv2(Table1_hydro_models, 'Table1_hydro_models.csv', row.names = FALSE, fileEncoding = "ISO-8859-1")
 
 
 #### Clear the environment from objects to free some memory space ####
