@@ -56,6 +56,9 @@ DataREPHY_pigments_select <- DataREPHY_pigments %>% # DataREPHY_pigments_select
   mutate(Year = year(Date)) %>%
   # create a calendar day variable
   mutate(Day = as.numeric(yday(Date))) %>%
+  # Create a 'fortnight' variable to match the sampling frequency
+  mutate(Week = week(Date)) %>%
+  mutate(Fortnight = ceiling(Week/2)) %>%
   # If no Year is indicated, discard
   filter(!is.na(Year))
 
@@ -269,3 +272,104 @@ ggplot(Table_pigments_plot_crop)+
 # Save the plot (for sending it to Maud :)
 # ggsave('REPHY_seasonality_Alloxanthin_ratio_crop.tiff', height = 150,
 #        width = 200, unit = 'mm', compression = 'lzw')
+
+### Chlorophyll a ####
+## All data points ####
+
+### chlorophyll a concentration
+# Plot the chlorophyll a concentration as function of date
+ggplot(Table_pigments_plot)+
+  geom_point(aes(x=Date, y=CHLOROA, color  = Code_point_Libelle), 
+             alpha = .7) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  scale_color_discrete(type = pheno_palette13, guide = 'none') +
+  theme_classic() +
+  labs(y="Chlorophyll a (µg/L)", x="Date")
+
+# Note : there are some NAs in the dataset
+
+# Save the plot (for sending it to Maud :)
+# ggsave('REPHY_timeseries_CHLOROA.tiff', height = 150,
+#        width = 200, unit = 'mm', compression = 'lzw')
+
+### Chlorophyll a concentration in one composite year
+# Plot the chlorophyll a concentration as function of calendar day
+ggplot(Table_pigments_plot)+
+  geom_point(aes(x=Day, y=CHLOROA, color  = Code_point_Libelle), 
+             alpha = .7) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  scale_color_discrete(type = pheno_palette13, guide = 'none') +
+  theme_classic() +
+  labs(y="Chlorophyll a concentration (µg/L)", x="Calendar day")
+
+# Save the plot (for sending it to Maud :)
+# ggsave('REPHY_seasonality_CHLOROA.tiff', height = 150,
+#        width = 200, unit = 'mm', compression = 'lzw')
+
+
+
+#### Summarising by fortnight ####
+
+Table_pigments_fortnightly <- Table_pigments_plot %>%
+  group_by(Code_point_Libelle, Fortnight) %>%
+  summarise(# Allox
+    Allo.med = median(Allo, na.rm = TRUE), 
+    Allo.mean = mean(Allo, na.rm = TRUE),
+    # Allox/CHLOROA
+    Allo.ratio.med = median(Allo.ratio, na.rm = TRUE), 
+    Allo.ratio.mean = mean(Allo.ratio, na.rm = TRUE),
+    # Chlorophyll a, ignore NAs
+    CHLOROA.med = median(CHLOROA, na.rm = TRUE), 
+    CHLOROA.mean = mean(CHLOROA, na.rm = TRUE),
+    .groups = 'keep') %>%
+  # filter out Fortnight 27 as there isn't enough measurements to calculate
+  # a reliable median
+  filter(Fortnight < 27)
+
+# Write that down!
+# write.csv2(Table_pigments_fortnightly, 'Table_hydro_fortnightly_20240905.csv',
+#            row.names = FALSE, fileEncoding = "ISO-8859-1")
+
+# As boxplots
+# Alloxanthin
+ggplot(Table_pigments_plot)+
+  geom_boxplot(aes(x=as.factor(Fortnight), y=Allo, color  = Code_point_Libelle), 
+             alpha = .7) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  scale_color_discrete(type = pheno_palette13, guide = 'none') +
+  theme_classic() +
+  labs(y="Alloxanthin by fortnight (µg/L)", x="Fortnight")
+
+# Chlorophyll a
+ggplot(Table_pigments_plot)+
+  geom_boxplot(aes(x=as.factor(Fortnight), y=CHLOROA, color  = Code_point_Libelle), 
+               alpha = .7) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  scale_color_discrete(type = pheno_palette13, guide = 'none') +
+  theme_classic() +
+  labs(y="Chlorophyll a by fortnight (µg/L)", x="Fortnight")
+
+# As heatmaps
+# Now let's plot that as a heatmap
+
+# Alloxanthin
+ggplot(Table_pigments_fortnightly, aes(x = Fortnight, y = 1, fill = Allo.med)) +
+  geom_tile()  +
+  scale_fill_distiller(palette = 'RdBu', direction = -1) +
+  facet_wrap(facets = c('Code_point_Libelle'))
+
+ggplot(Table_pigments_fortnightly, aes(x = Fortnight, y = 1, fill = Allo.mean)) +
+  geom_tile()  +
+  scale_fill_distiller(palette = 'RdBu', direction = -1) +
+  facet_wrap(facets = c('Code_point_Libelle'))
+
+# Chlorophyll a
+ggplot(Table_pigments_fortnightly, aes(x = Fortnight, y = 1, fill = CHLOROA.med)) +
+  geom_tile()  +
+  scale_fill_cmocean(name = 'algae') +
+  facet_wrap(facets = c('Code_point_Libelle'))
+
+ggplot(Table_pigments_fortnightly, aes(x = Fortnight, y = 1, fill = CHLOROA.mean)) +
+  geom_tile()  +
+  scale_fill_cmocean(name = 'algae') +
+  facet_wrap(facets = c('Code_point_Libelle'))
