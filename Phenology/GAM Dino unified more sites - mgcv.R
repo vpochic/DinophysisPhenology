@@ -1,6 +1,6 @@
 ###### GAM for Dinophysis phenology with mgcv - unified 2 ###
 ## V. POCHIC
-# 2024-08-19
+# 2024-09-23
 
 # In this version of the script we add the sites in Pas de Calais 
 # ('Point 1 Boulogne' and 'At so') and in Northern Britanny ('les Hébihens' and 
@@ -10,6 +10,7 @@
 library(tidyverse)
 library(ggplot2)
 library(mgcv)
+library(gratia)
 library(viridis)
 library(nlme)
 
@@ -127,6 +128,66 @@ hist(Season_Dino$Day, breaks = 26)
 # Let's save that
 # write.csv2(Season_Dino, 'Season_Dino.csv', row.names = FALSE,
 #            fileEncoding = "ISO-8859-1")
+
+
+### Plotting the dataset for one site as an example
+
+plotDino_OL_nozeros <- filter(Season_Dino, (Code_point_Libelle == 'Ouest Loscolo'
+                                            & true_count != 0))
+plotDino_OL <- filter(Season_Dino, (Code_point_Libelle == 'Ouest Loscolo'))
+
+# Plot the Dinophysis observations as function of date (timeseries view)
+ggplot(plotDino_OL_nozeros)+
+  geom_point(aes(x=Date, y=true_count), color = '#2156A1',
+             size = 3, alpha = .8) +
+  theme_classic() +
+  labs(title = 'Ouest Loscolo',
+         y="Dinophysis cells observed in 10 mL", x="Date")
+
+# Save the plot
+# ggsave('plotDino_timeseries_OL.tiff', height = 150, width = 300,
+# dpi = 300, unit = 'mm', compression = 'lzw')
+
+
+### Plot the observations per year
+
+ggplot(plotDino_OL_nozeros)+
+  geom_point(aes(x=Day, y=true_count), color = '#2156A1', size = 2,
+             alpha = .8) +
+  theme_classic() +
+  facet_wrap(facets = 'Year', scales = 'free_y') +
+  labs(title = 'Ouest Loscolo',
+       y="Dinophysis cells observed in 10 mL", x="Calendar day")
+
+# Save the plot
+# ggsave('plotDino_year_OL.tiff', height = 150, width = 300,
+# dpi = 300, unit = 'mm', compression = 'lzw')
+
+### In 1 composite year
+
+ggplot(plotDino_OL_nozeros)+
+  geom_point(aes(x=Day, y=true_count), color = '#2156A1', size = 3,
+             alpha = .8) +
+  theme_classic() +
+  labs(title = 'Ouest Loscolo - composite year',
+       y="Dinophysis cells observed in 10 mL", x="Calendar day")
+
+# Save the plot
+# ggsave('plotDino_composite-year_OL.tiff', height = 150, width = 300,
+# dpi = 300, unit = 'mm', compression = 'lzw')
+
+### Composite year with zeros
+
+ggplot(plotDino_OL)+
+  geom_point(aes(x=Day, y=true_count), color = '#2156A1', size = 3,
+             alpha = .8) +
+  theme_classic() +
+  labs(title = 'Ouest Loscolo - composite year',
+       y="Dinophysis cells observed in 10 mL", x="Calendar day")
+
+# Save the plot
+# ggsave('plotDino_composite-year_OL_zeros.tiff', height = 150, width = 300,
+# dpi = 300, unit = 'mm', compression = 'lzw')
 
 #### Where the zeros lie ####
 
@@ -942,3 +1003,306 @@ ggplot(response_pred_plot_DayF, aes(x = DayF, y = median.fit,
 # Saving plot
 # ggsave('gam_Dino_allsites_crop_DayF.tiff', dpi = 300, height = 270, width = 300,
 #        units = 'mm', compression = 'lzw')
+
+#### Alternative GAM for teaching purposes ####
+
+gam_Dino_OL <- gam(data = plotDino_OL, 
+                   # Only a spline for the day of the year
+                   # The use of a cyclic basis spline helps to make ends meet at the
+                   # first and last days of the year
+                   # 'k = -1' allows the model to fix the 'best' number of basic
+                   # functions (= knots)
+                   formula = true_count~s(Day, bs = 'cc', k = -1) 
+                   # We add the Year as a random effect. This will help to assess and
+                   # smooth the effects of interannual variability in the phenology
+                   + s(Year, bs = 're', k = -1),
+                   # Introducing the weights
+                   # weights = unif_weight,
+                   # Using a Poisson distribution for count data
+                   family = poisson(),
+                   # Restricted maximum likelihood estimation (recommended method)
+                   method = 'REML')
+
+summary(gam_Dino_OL)
+gam.check(gam_Dino_OL)
+
+# gam.check indicates that there might be an issue with the random effect
+# smooth for 'Year' (low p-value)
+
+# Create a new 'empty' dataset for storing model prediction (fit)
+gam_Dino_OL_newdata <- expand_grid(Day=seq(1, 365),
+                                   # We add a Year vector as it has become a factor
+                                   # of the model
+                                   Year=seq(min(Season_Dino$Year), 
+                                            max(Season_Dino$Year)))
+
+## Get the inverse link function of the model
+# With this function, we can transform the prediction we make on the link
+#scale to the response scale
+ilink <- gam_Dino_OL$family$linkinv
+
+## Predict : add fit and se.fit on the **link** scale
+gam_Dino_OL_newdata <- bind_cols(gam_Dino_OL_newdata, 
+                                 setNames(as_tibble(
+                                   predict(gam_Dino_OL, gam_Dino_OL_newdata, 
+                                           se.fit = TRUE, type = 'link')[1:2]),
+                                   c('fit_link','se_link')))
+
+## Create the 95% confidence interval (2*standard error fit) and backtransform 
+# to response variable using the inverse link function
+gam_Dino_OL_newdata <- mutate(gam_Dino_OL_newdata,
+                              fit_resp  = ilink(fit_link),
+                              right_upr = ilink(fit_link + (2 * se_link)),
+                              right_lwr = ilink(fit_link - (2 * se_link)))
+# Check the confidence interval. It should not extend below 0 (negative counts
+# are impossible)
+min(gam_Dino_OL_newdata$right_lwr) # Nice :)
+min(gam_Dino_OL_newdata$fit_resp)
+max(gam_Dino_OL_newdata$right_upr) # Nice too
+max(gam_Dino_OL_newdata$fit_resp)
+# But we can see that the confidence interval is ridiculously small around the
+# min and max of the model fit.
+
+# Plot
+
+ggplot(gam_Dino_OL_newdata, aes(x = Day, y = fit_resp))+
+  geom_ribbon(aes(x=Day, ymin=right_lwr, ymax=right_upr), fill = 'grey70', alpha=0.7) +
+  geom_line(linewidth = 1) +
+  geom_point(data = Season_Dino, aes(x = Day, y = true_count, color = Year), shape = 21) +
+  scale_color_viridis_c('Year') +
+  theme_classic()
+
+# Saving plot
+# ggsave('gam_Dino_OL_all.tiff', dpi = 300, height = 120, width = 160, 
+#        units = 'mm', compression = 'lzw')
+
+### Checking the model
+ModelOutputs<-data.frame(Fitted=fitted(gam_Dino_OL),
+                         Residuals=resid(gam_Dino_OL))
+
+# We're gonna make our own qq plot with colors identifying sites
+# We base it on the structure of the model
+qq_data <- gam_Dino_OL$model
+# then we add the values of fitted and residuals 
+# (but are they in the same order as the model? -> need to check that)
+qq_data <- bind_cols(qq_data, ModelOutputs)
+
+# Plot : verify that true data matches (more or less) model fit
+ggplot(qq_data)+
+  geom_point(aes(x = Day, y = true_count), color = 'red') +
+  geom_point(aes(x = Day, y = Fitted), color = 'blue') +
+  theme_classic() +
+  labs(y = "Dinophysis count", x = "Calendar day")
+
+# It matches! great!
+
+# Now for the "official" qq plot, with color of the points depending on site
+# Color palette
+# Blues for Northern Brittany: '#0A1635', '#2B4561'
+# Terra cotta for Pas de Calais: 'sienna4', 'tan3'
+pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646',
+                     '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
+
+# We need to reorder the factor 'Code_point_Libelle' so the sites appear in the
+# order we want
+qq_data_reordered <- qq_data %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Parc Leucate 2', 'Bouzigues (a)',
+                                          'Sète mer', 'Diana centre')) %>%
+  # we ungroup the data frame to produce only 1 qq-plot
+  ungroup()
+
+# And (qq-)plot
+qqplot_custom <- ggplot(qq_data) +
+  stat_qq(aes(sample=Residuals), color = '#2156A1', alpha = .7) +
+  stat_qq_line(aes(sample=Residuals), color = '#2156A1') +
+  theme_classic() +
+  labs(y="Sample Quantiles",x="Theoretical Quantiles")
+
+qqplot_custom
+
+# Save the plot
+# ggsave('qqplot_custom_16sites.tiff', dpi = 300, height = 175, width = 250,
+#                units = 'mm', compression = 'lzw')
+
+# We can do the same for residuals vs fitted
+RvFplot_custom <- ggplot(qq_data)+
+  geom_point(aes(x=Fitted,y=Residuals), 
+             color = '#2156A1', alpha = .7) +
+  theme_classic() +
+  labs(y="Residuals",x="Fitted Values")
+
+RvFplot_custom
+
+# Save the plot
+# ggsave('RvFplot_custom_16sites.tiff', dpi = 300, height = 175, width = 250,
+#                units = 'mm', compression = 'lzw')
+
+# And let's do one last diagnostic plot with histogram of residuals
+HistRes_custom <- ggplot(qq_data, aes(x = Residuals))+
+  geom_histogram(binwidth = 1, fill = '#2156A1')+
+  theme_classic() +
+  labs(x='Residuals', y = 'Count')
+
+HistRes_custom
+
+# Save the plot
+# ggsave('HistRes_custom_16sites.tiff', dpi = 300, height = 175, width = 250,
+#                units = 'mm', compression = 'lzw')
+
+#### Plotting additional components of the GAM ####
+
+### 1) Plotting smooths of linear predictors ####
+
+# Define function "EvaluateSmooths"
+# (Function from this post by unique2 on StackOverflow. Many thanks to them!)
+# https://stackoverflow.com/questions/19735149/is-it-possible-to-plot-the-smooth-components-of-a-gam-fit-with-ggplot2)
+
+EvaluateSmooths = function(model, select=NULL, x=NULL, n=100) {
+  if (is.null(select)) {
+    select = 1:length(model$smooth)
+  }
+  do.call(rbind, lapply(select, function(i) {
+    smooth = model$smooth[[i]]
+    data = model$model
+    
+    if (is.null(x)) {
+      min = min(data[smooth$term])
+      max = max(data[smooth$term])
+      x = seq(min, max, length=n)
+    }
+    if (smooth$by == "NA") {
+      by.level = "NA"
+    } else {
+      by.level = smooth$by.level
+    }
+    range = data.frame(x=x, by=by.level)
+    names(range) = c(smooth$term, smooth$by)
+    
+    mat = PredictMat(smooth, range)
+    par = smooth$first.para:smooth$last.para
+    
+    y = mat %*% model$coefficients[par]
+    
+    se = sqrt(rowSums(
+      (mat %*% model$Vp[par, par, drop = FALSE]) * mat
+    ))
+    
+    return(data.frame(
+      label=smooth$label
+      , x.var=smooth$term
+      , x.val=x
+      , by.var=smooth$by
+      , by.val=by.level
+      , value = y
+      , se = se
+    ))
+  }))
+}
+
+# Call the function on the desired GAM
+gamOL_smooths = EvaluateSmooths(gam_Dino_OL)
+
+# Plot the smooths for variables Day and Year
+ggplot(gamOL_smooths, aes(x.val, value)) + 
+  geom_line(color = '#2156A1') + 
+  geom_line(aes(y=value + 2*se), linetype="dashed", color = '#2156A1') + 
+  geom_line(aes(y=value - 2*se), linetype="dashed", color = '#2156A1') + 
+  facet_wrap(facets = 'x.var', scales = 'free') +
+  labs(x = 'Value of linear predictor', y = 'Smooth value', title = 'GAM smooths') +
+  theme_classic()
+
+### 2) Plotting basis functions of the GAM ####
+
+# We use the 'basis' function from package gratia
+basisOL <- basis(gam_Dino_OL)
+# Let's say we only want basis functions for the 'Day' variable
+basisOL_day <- filter(basisOL, smooth == 's(Day)')
+
+# Define a nice color palette (from the Bretagne color palettes!)
+palette_splines8 <- c('#0A1635', '#76A7E2', '#FBA823', '#8D6456',
+                      '#8B064B', '#FF6448', '#649003', '#1F3700')
+
+# Plot the basis functions for variable Day
+ggplot(basisOL_day, aes(x = Day, y = ilink(value), color = bf)) + 
+  geom_line(linewidth = .75, alpha = .8) +
+  scale_color_discrete(type = palette_splines8, guide = 'none') +
+  labs(x = 'Calendar day', y = 'Basis spline value', 
+       title = 'The 8 basis functions of the GAM') +
+  theme_classic()
+
+# Pretty nice
+# Let's do a plot in 3 steps
+
+# First step, only data points (cut at the top for clarity)
+ggplot(basisOL_day, aes(x = Day, y = ilink(value), color = bf)) +
+  # plot the data
+  geom_point(data = plotDino_OL, aes(x=Day, y=true_count), 
+             color = '#2156A1', size = 3,
+             alpha = .3) +
+  # cut the y scale at 20
+  scale_y_continuous(limits = c(0,20)) +
+  # Text
+  labs(x = 'Calendar day', y = 'Dinophysis cells observed in 10 mL') +
+  theme_classic()
+
+# Save the plot (step 1)
+# ggsave('educGAM_step1.tiff', height = 150, width = 300,
+# dpi = 300, unit = 'mm', compression = 'lzw')
+
+# Second step, plotting the basis functions of the GAM
+ggplot(basisOL_day, aes(x = Day, y = ilink(value), color = bf)) +
+  # plot the data
+  geom_point(data = plotDino_OL, aes(x=Day, y=true_count), 
+             color = '#2156A1', size = 3,
+             alpha = .3) +
+  # plot the basis functions
+  geom_line(linewidth = 1, alpha = .8) +
+  # color scale
+  scale_color_discrete(type = palette_splines8, guide = 'none') +
+  # cut the y scale at 20
+  scale_y_continuous(limits = c(0,20)) +
+  # Text
+  labs(x = 'Calendar day', y = 'Dinophysis cells observed in 10 mL') +
+  theme_classic()
+
+# Save the plot (step 2)
+# ggsave('educGAM_step2.tiff', height = 150, width = 300,
+# dpi = 300, unit = 'mm', compression = 'lzw')
+
+# Third step, with the smooth
+# /!\ This step uses objects defined in the previous section of the script /!\
+ggplot(basisOL_day, aes(x = Day, y = ilink(value), color = bf)) +
+  # plot the data
+  geom_point(data = plotDino_OL, aes(x=Day, y=true_count), 
+             color = '#2156A1', size = 3,
+             alpha = .3) +
+  # plot the basis functions
+  geom_line(linewidth = 1, alpha = .8) +
+  # plot the smooth
+  geom_line(data = gamOL_smooths_Day, aes(x.val, ilink(value)),
+            color = '#2156A1', linewidth = 1.5) +
+  # And the std error
+  geom_line(data = gamOL_smooths_Day, aes(x = x.val, y=ilink(value + 2*se)), 
+            linetype="dashed", color = '#2156A1', alpha = .8, linewidth = 1) + 
+  geom_line(data = gamOL_smooths_Day, aes(x = x.val, y=ilink(value - 2*se)), 
+            linetype="dashed", color = '#2156A1', alpha = .8, linewidth = 1) + 
+  # color scale
+  scale_color_discrete(type = palette_splines8, guide = 'none') +
+  # cut the y scale at 20
+  scale_y_continuous(limits = c(0,20)) +
+  # Text
+  labs(x = 'Calendar day', y = 'Dinophysis cells observed in 10 mL') +
+  theme_classic()
+
+# Save the plot (step 3)
+# ggsave('educGAM_step3.tiff', height = 150, width = 300,
+# dpi = 300, unit = 'mm', compression = 'lzw')
