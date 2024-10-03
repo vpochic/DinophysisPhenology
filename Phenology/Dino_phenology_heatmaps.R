@@ -1,6 +1,6 @@
 #### Temperature and salinity heatmaps for Dinophysis phenology ##
 ## V. POCHIC
-# 2024/08/21
+# 2024/10/03
 # --> Now with only the sites selected for phenology analysis
 # (The Channel-Atlantic coast) and with Chl a
 
@@ -41,6 +41,108 @@ Table_hydro_select <- filter(Table_hydro, Code_point_Libelle %in%
   # Create a 'fortnight' variable to match the sampling frequency
   mutate(Week = week(Date)) %>%
   mutate(Fortnight = ceiling(Week/2))
+
+### Importing stratification data ####
+
+# This is just a bit trickier
+# We need to import the data that sits in separate files then stick it together
+
+### Stratification index averaged on the 14 days before the date
+# Read all the files in a folder at once
+
+# Create a list of file names (without the path)
+list_SI_14d <- list.files(path = 'GAMAR_csv/SI_14d_before/', full.names = FALSE)
+# Read all files in a dataframe with map_dfr
+Stratif_14d <- map_dfr(list_SI_14d, ~ read_csv(
+                                      file.path('GAMAR_csv/SI_14d_before/', .),
+                                      id = 'name')) %>%
+  
+  # Fix a problem in column names : replace all spaces in column names with '_'
+  rename_with(~ gsub(" ","_", .x), contains(" ")) %>%
+  # Create 'Code_point_Libelle', the site id that is missing in the data
+  mutate(Code_point_Libelle = ifelse(
+    # Boulogne
+    grepl('BOULOGNE', name, fixed = TRUE) == TRUE, 'Point 1 Boulogne',
+    # At so
+    ifelse(grepl('AT_SO', name, fixed = TRUE) == TRUE, 'At so',
+    # Antifer
+    ifelse(grepl('ANTIFER', name, fixed = TRUE) == TRUE, 'Antifer ponton pétrolier',
+    # Cabourg
+    ifelse(grepl('CABOURG', name, fixed = TRUE) == TRUE, 'Cabourg',
+    # Les Hébihens
+    ifelse(grepl('LES_HÉBIHENS', name, fixed = TRUE) == TRUE, 'les Hébihens',
+    # Loguivy
+    ifelse(grepl('LOGUIVY', name, fixed = TRUE) == TRUE, 'Loguivy',
+    # Men er Roue
+    ifelse(grepl('MEN_ER_ROUE', name, fixed = TRUE) == TRUE, 'Men er Roue',
+    # Ouest Loscolo
+    ifelse(grepl('LOSCOLO', name, fixed = TRUE) == TRUE, 'Ouest Loscolo',
+    # Le Cornard
+    ifelse(grepl('CORNARD', name, fixed = TRUE) == TRUE, 'Le Cornard',
+    # Auger
+    ifelse(grepl('AUGER', name, fixed = TRUE) == TRUE, 'Auger',
+    # Arcachon
+    ifelse(grepl('ARCACHON', name, fixed = TRUE) == TRUE, 'Arcachon - Bouée 7',
+    # Teychan bis
+    'Teychan bis')))))))))))) %>%
+  # Get rid of the awful 'name' variable
+  select(-c('name')) %>%
+  # Remove duplicates
+  distinct(Target_Date, Closest_Date, Code_point_Libelle,
+           .keep_all = TRUE)
+
+### Stratification index on the date of the REPHY sampling
+# Exactly the same
+
+# Create a list of file names (without the path)
+list_SI_dates <- list.files(path = 'GAMAR_csv/SI_REPHY_dates/', full.names = FALSE)
+# Read all files in a dataframe with map_dfr
+Stratif_dates <- map_dfr(list_SI_dates, ~ read_csv(
+  file.path('GAMAR_csv/SI_REPHY_dates/', .),
+  id = 'name')) %>%
+  # Fix a problem in column names : replace all spaces in column names with '_'
+  rename_with(~ gsub(" ","_", .x), contains(" ")) %>%
+  # Create 'Code_point_Libelle', the site id that is missing in the data
+  mutate(Code_point_Libelle = ifelse(
+    # Boulogne
+    grepl('BOULOGNE', name, fixed = TRUE) == TRUE, 'Point 1 Boulogne',
+    # At so
+    ifelse(grepl('AT_SO', name, fixed = TRUE) == TRUE, 'At so',
+           # Antifer
+           ifelse(grepl('ANTIFER', name, fixed = TRUE) == TRUE, 'Antifer ponton pétrolier',
+                  # Cabourg
+                  ifelse(grepl('CABOURG', name, fixed = TRUE) == TRUE, 'Cabourg',
+                         # Les Hébihens
+                         ifelse(grepl('LES_HÉBIHENS', name, fixed = TRUE) == TRUE, 'les Hébihens',
+                                # Loguivy
+                                ifelse(grepl('LOGUIVY', name, fixed = TRUE) == TRUE, 'Loguivy',
+                                       # Men er Roue
+                                       ifelse(grepl('MEN_ER_ROUE', name, fixed = TRUE) == TRUE, 'Men er Roue',
+                                              # Ouest Loscolo
+                                              ifelse(grepl('LOSCOLO', name, fixed = TRUE) == TRUE, 'Ouest Loscolo',
+                                                     # Le Cornard
+                                                     ifelse(grepl('CORNARD', name, fixed = TRUE) == TRUE, 'Le Cornard',
+                                                            # Auger
+                                                            ifelse(grepl('AUGER', name, fixed = TRUE) == TRUE, 'Auger',
+                                                                   # Arcachon
+                                                                   ifelse(grepl('ARCACHON', name, fixed = TRUE) == TRUE, 'Arcachon - Bouée 7',
+                                                                          # Teychan bis
+                                                                          'Teychan bis')))))))))))) %>%
+  # Get rid of the awful 'name' variable
+  select(-c('name')) %>%
+  # Remove duplicates
+  distinct(Target_Date, Closest_Date, Code_point_Libelle,
+           .keep_all = TRUE)
+
+# Bind both datasets (making it easier for processing)
+Table_stratif <- left_join(Stratif_14d, Stratif_dates, 
+                           by = c('Target_Date', 
+                                  'Closest_Date', 'Code_point_Libelle'),
+                           suffix = c('',''))
+
+# Save the stratification dataset
+# write.csv2(Table_stratif, 'Stratif_index_GAMAR_12sites.csv', row.names = FALSE,
+# fileEncoding = 'ISO-8859-1')
 
 ##### Plotting temperatures #####
 
@@ -307,6 +409,60 @@ ggplot(Table_chla_select) +
 # ggsave('Chla_12sites_Dinophenology.tiff', dpi = 300, width = 300, height = 200,
 #        units = 'mm', compression = 'lzw')
 
+##### Plotting Stratification Index ####
+
+### We make another table for SI
+Table_stratif_select <- Table_stratif %>%
+  # Change to date format
+  mutate(Date = ymd_hms(Closest_Date)) %>%
+  mutate(Month = month(Date)) %>%
+  # Create a 'fortnight' variable to match the sampling frequency
+  mutate(Week = week(Date)) %>%
+  mutate(Fortnight = ceiling(Week/2))
+
+### Now let's plot !
+
+# First, reorder the factor so that sampling sites appear in the desired order
+Table_stratif_select <- Table_stratif_select %>%
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis'))
+
+# Plot aesthetics
+pheno_palette12 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646')
+
+# Little plot on stratif (dates)
+ggplot(Table_stratif_select, aes(x = Date, y = Stratification_Index, 
+                                 color = Code_point_Libelle)) +
+  geom_point()  +
+  scale_color_discrete(type = pheno_palette12) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y')
+
+# Everything's fine
+# Now let's plot that as a heatmap
+
+ggplot(Table_stratif_select, aes(x = Date, y = 1, fill = Stratification_Index)) +
+  geom_tile()  +
+  facet_wrap(facets = c('Code_point_Libelle'))
+# Strange
+
+# As dot plot by fortnight
+ggplot(Table_stratif_select, aes(x = Fortnight,
+                              # Convert chl a to log scale 
+                              # (dealing with extreme values)
+                              y = Stratification_Index, 
+                              color = Code_point_Libelle)) +
+  geom_point()  +
+  scale_color_discrete(type = pheno_palette12) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y')
+
 ### Summarising by month ####
 
 Table_hydro_monthly <- Table_hydro_select %>%
@@ -373,7 +529,7 @@ ggplot(Table_hydro_fortnightly, aes(x = Fortnight, y = 1, fill = SALI.mean)) +
   scale_fill_cmocean(name = 'haline') +
   facet_wrap(facets = c('Code_point_Libelle'))
 
-# Salinity
+# Chlorophyll a
 ggplot(Table_hydro_fortnightly, aes(x = Fortnight, y = 1, fill = CHLOROA.med)) +
   geom_tile()  +
   scale_fill_cmocean(name = 'algae') +
@@ -382,4 +538,36 @@ ggplot(Table_hydro_fortnightly, aes(x = Fortnight, y = 1, fill = CHLOROA.med)) +
 ggplot(Table_hydro_fortnightly, aes(x = Fortnight, y = 1, fill = CHLOROA.mean)) +
   geom_tile()  +
   scale_fill_cmocean(name = 'algae') +
+  facet_wrap(facets = c('Code_point_Libelle'))
+
+
+### Now for the stratification index
+
+Table_stratif_fortnightly <- Table_stratif_select %>%
+  group_by(Code_point_Libelle, Fortnight) %>%
+  summarise(# Stratification_Index (on date)
+    SI_date.med = median(Stratification_Index), 
+    SI_date.mean = mean(Stratification_Index),
+    # 14-Day_Average_SI (on the previous 14 days)
+    SI_14d.med = median(`14-Day_Average_SI`), 
+    SI_14d.mean = mean(`14-Day_Average_SI`),
+    .groups = 'keep') %>%
+  # filter out Fortnight 27 as there isn't enough measurements to calculate
+  # a reliable median
+  filter(Fortnight < 27)
+
+# Write that down!
+# write.csv2(Table_stratif_fortnightly, 'Table_stratif_fortnightly_20240923.csv',
+#            row.names = FALSE, fileEncoding = "ISO-8859-1")
+
+# Stratification index heatmaps
+# On date
+ggplot(Table_stratif_fortnightly, aes(x = Fortnight, y = 1, fill = SI_date.med)) +
+  geom_tile()  +
+  scale_fill_cmocean(name = 'tempo') +
+  facet_wrap(facets = c('Code_point_Libelle'))
+# 14 previous days
+ggplot(Table_stratif_fortnightly, aes(x = Fortnight, y = 1, fill = SI_14d.med)) +
+  geom_tile()  +
+  scale_fill_cmocean(name = 'tempo') +
   facet_wrap(facets = c('Code_point_Libelle'))

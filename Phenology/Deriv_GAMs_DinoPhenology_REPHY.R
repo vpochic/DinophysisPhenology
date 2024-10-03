@@ -1,6 +1,6 @@
 #### Derivatives of fitted GAMs for Dinophysis phenology ##
 ### V. POCHIC
-# 2024-08-21
+# 2024-10-03
 
 # /!\ This script requires data tables generated with the 'GAM Dino unified more sites' 
 # and 'GAM Meso unified' AND Dino_phenology_heatmaps scripts /!\
@@ -236,6 +236,9 @@ gam_Dino.d <- derivatives(# The object of which we want to calculate derivatives
   )
 
 # It works!
+# Save the file
+# write.csv2(gam_Dino.d, 'Derivatives_GAM_Dino_12sites_20241003.csv', 
+#            row.names = FALSE)
 # Let's try to plot that shall we
 
 ### Plotting
@@ -260,15 +263,15 @@ gam_Dino.d <- gam_Dino.d %>%
                                           'Sète mer', 'Diana centre'))
 
 # A nice plot
-ggplot(gam_Dino.d, aes(x = data, y = derivative, 
+ggplot(gam_Dino.d, aes(x = Day, y = .derivative, 
                            color = Code_point_Libelle,
                            fill = Code_point_Libelle)) +
   # Confidence interval
-         geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
+         geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci), alpha = 0.2) +
   # Derivative fit
          geom_path(lwd = 1) +
   # Draw a line at 0 to separate accumulation from loss
-         geom_line(aes(x = data, y = 0), color = 'grey10', linewidth = .7) +
+         geom_line(aes(x = Day, y = 0), color = 'grey10', linewidth = .7) +
   labs(y = "1st derivative of Dinophysis GAM",
        x = "Day of the year",
        title = "1st derivative of Dinophysis GAM"
@@ -282,7 +285,7 @@ ggplot(gam_Dino.d, aes(x = data, y = derivative,
 # That seems to work nicely
 
 # Saving plot
-# ggsave('DinoDeriv_16sites_phenology.tiff', dpi = 300, height = 225, width = 300,
+# ggsave('DinoDeriv_12sites_phenology_20241003.tiff', dpi = 300, height = 225, width = 300,
 #        units = 'mm', compression = 'lzw')
 
 ### We can also do that with only the sites we will analyse further
@@ -366,18 +369,25 @@ Deriv_Dino <- gam_Dino.d %>%
 
 #### Plotting the derivative of Dinophysis along the Mesodinium model ####
 
-### Import Mesodinium GAM data for plotting ####
+### Import Mesodinium and Dinophysis GAM data for plotting ####
 pred_plot <- read.csv2('pred_plot_MESO_20240418.csv', header = TRUE,
+                            fileEncoding = 'ISO-8859-1')
+
+pred_plot_Dino <- read.csv2('pred_plot_20240813_14sites.csv', header = TRUE,
                             fileEncoding = 'ISO-8859-1')
 
 # Compute the response pred plot
 # We need the inverse link function of gam_Meso
 ilink <- gam_Meso$family$linkinv
+ilink_Dino <- gam_Dino$family$linkinv
 
 # Transform values so they are expressed in the response variable units
 # (by applying the inverse link function)
 response_pred_plot <- as.data.frame(pred_plot) %>%
   mutate(across(c('median.fit', 'lwrS', 'uprS', 'lwrP', 'uprP'), ~ ilink(.)))
+
+response_pred_plot_Dino <- as.data.frame(pred_plot_Dino) %>%
+  mutate(across(c('median.fit', 'lwrS', 'uprS', 'lwrP', 'uprP'), ~ ilink_Dino(.)))
 
 # Let's save the response_pred_plot for the Meso GAM
 # write.csv2(response_pred_plot, 'response_pred_plot_MESO_20240424.csv',
@@ -599,6 +609,12 @@ Season_Meso_select <- Season_Meso_crop %>%
                                    'Men er Roue', 'Ouest Loscolo'))
 
 ## Plot (continuous version) ####
+
+# A color palette with 4 colors
+pheno_palette4 <- c('red3', 'orangered',
+                    '#2156A1', '#5995E3')
+
+# Plot with GAM of Mesodinium and Dinophysis derivative
 ggplot(select_plot) +
   # First part of plot (a rug plot)
   # We use a color palette from the cmocean package
@@ -609,7 +625,7 @@ ggplot(select_plot) +
   ) +
   # Labels
   labs(y = "Mesodinium cells observed in 10 mL",
-       x = "Day of the year",
+       x = "Calendar day",
        title = "Mesodinium and Dinophysis dynamics",
        color = c(expression(paste('Dinophysis loss/accumulation (d'^'-1',')')))
        #subtitle = sprintf("Each line is one of %i draws from the Bayesian posterior distribution of the model", nrnd)
@@ -632,33 +648,111 @@ ggplot(select_plot) +
   # Facet
   facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
   # Set the color palette :
-  scale_color_discrete(type = pheno_palette12, guide = 'none') +
-  scale_fill_discrete(type = pheno_palette12, guide = 'none') +
-  theme(
-    # panel
-    panel.background = element_rect(fill = 'transparent', 
-                                    linewidth = .3, 
-                                    color = 'grey10'),
-    # legend
-    legend.background = element_rect(linewidth = .5, color = 'grey10'),
-    legend.title = element_text(size = 11, color = 'grey5'),
-    legend.frame = element_rect(linewidth = .5, color = 'grey10'),
-    legend.ticks = element_line(linewidth = .2, color = 'grey25'),
-    legend.position = 'bottom',
-    # grid
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank(),
-    panel.grid.major.y = element_blank(),
-    panel.grid.minor.y = element_blank(),
-    # Facet labels
-    strip.background = element_rect(fill = 'grey80',
-                                    linewidth = .2,
-                                    color = 'grey10'),
-    strip.text = element_text(color = 'grey5')
-  )
+  scale_color_discrete(type = pheno_palette4, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette4, guide = 'none') +
+  # Theme
+  theme(plot.title = element_text(size = 11), 
+        # Axis
+        axis.title.x = element_text(size=10), 
+        axis.title.y =element_text(size=10), 
+        axis.text = element_text(size=8, color = 'black'),
+        axis.line.x = element_line(linewidth = .2, color = 'black'),
+        axis.line.y = element_line(linewidth = .2, color = 'black'),
+        # Legend
+        legend.background = element_rect(linewidth = .5, color = 'grey10'),
+        legend.title = element_text(size = 10, color = 'grey5'),
+        legend.frame = element_rect(linewidth = .5, color = 'grey10'),
+        legend.ticks = element_line(linewidth = .2, color = 'grey25'),
+        legend.position = 'bottom',
+        # Panel
+        panel.grid = element_blank(),
+        panel.background = element_blank(),
+        # Facet labels
+        strip.background = element_rect(fill = 'transparent',
+                                        linewidth = 1,
+                                        color = 'grey10'),
+        strip.text = element_text(color = 'grey5', size = 7.5))
 
 # Saving plot
-# ggsave('Meso_and_DinoDeriv_4sites.tiff', dpi = 300, height = 170, width = 160,
+# ggsave('Meso_and_DinoDeriv_4sites_20240924.tiff', dpi = 300, height = 200, width = 250,
+#        units = 'mm', compression = 'lzw')
+
+## Plot (both GAM fits version) ####
+
+# Plot with GAMs of Mesodinium and Dinophysis
+# Select sites in the Dino GAM
+response_pred_plot_Dino <- filter(response_pred_plot_Dino, Code_point_Libelle 
+                                  %in% c(
+                                    # Baie de Seine
+                                    'Antifer ponton pétrolier', 'Cabourg',
+                                    # Bretagne Sud
+                                    'Men er Roue', 'Ouest Loscolo'))
+# Now plot
+ggplot(select_plot) +
+  # First part of plot (a rug plot)
+  # We use a color palette from the cmocean package
+  scale_color_cmocean(name = 'curl', direction = -1) +
+  geom_rug(aes(x = Day,
+               color = derivative),
+           linewidth = 1
+  ) +
+  # Labels
+  labs(y = "Cells observed in 10 mL",
+       x = "Calendar day",
+       title = "Mesodinium and Dinophysis dynamics",
+       color = c(expression(paste('Dinophysis loss/accumulation (d'^'-1',')')))
+  ) +
+  # Change the color scale
+  new_scale_color() +
+  # Second part of plot
+  # GAM of Mesodinium
+  geom_ribbon(aes(x = Day,
+                  ymin = lwrS, ymax = uprS,
+                  color = Code_point_Libelle,
+                  fill = Code_point_Libelle), alpha = 0,
+              linetype = 'dashed') +
+  geom_path(aes(x = Day, y = median.fit,
+                color = Code_point_Libelle),
+            lwd = 1, linetype = 'dashed') +
+  # GAM of Dinophysis
+  geom_ribbon(data = response_pred_plot_Dino, aes(x = Day,
+                  ymin = lwrS, ymax = uprS,
+                  color = Code_point_Libelle,
+                  fill = Code_point_Libelle), alpha = 0.2) +
+  geom_path(data = response_pred_plot_Dino, aes(x = Day, y = median.fit,
+                color = Code_point_Libelle),
+            lwd = 1) +
+  # Facet
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  # Set the color palette :
+  scale_color_discrete(type = pheno_palette4, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette4, guide = 'none') +
+  # Theme
+  theme(plot.title = element_text(size = 11), 
+        # Axis
+        axis.title.x = element_text(size=10), 
+        axis.title.y =element_text(size=10), 
+        axis.text = element_text(size=8, color = 'black'),
+        axis.line.x = element_line(linewidth = .2, color = 'black'),
+        axis.line.y = element_line(linewidth = .2, color = 'black'),
+        # Legend
+        legend.background = element_rect(linewidth = .5, color = 'grey10'),
+        legend.title = element_text(size = 10, color = 'grey5'),
+        legend.text = element_text(size = 8, color = 'grey5'),
+        legend.frame = element_rect(linewidth = .5, color = 'grey10'),
+        legend.ticks = element_line(linewidth = .2, color = 'grey25'),
+        legend.position = 'bottom',
+        # Panel
+        panel.grid = element_blank(),
+        panel.background = element_blank(),
+        # Facet labels
+        strip.background = element_rect(fill = 'transparent',
+                                        linewidth = 1,
+                                        color = 'grey10'),
+        strip.text = element_text(color = 'grey5', size = 7.5))
+
+# Saving plot
+# ggsave('Meso_and_Dino_GAMS_4sites_20240924.tiff', dpi = 300, height = 200, width = 250,
 #        units = 'mm', compression = 'lzw')
 
 ## Plot (discrete version) ####
@@ -763,6 +857,38 @@ Table_hydro_daily <- left_join(Daily_basis, Table_hydro_fortnightly,
 
 # Let's save this hydrology table for later
 # write.csv2(Table_hydro_daily, 'Table_hydro_daily_20240821.csv', row.names = FALSE,
+#            fileEncoding = 'ISO-8859-1')
+
+# Stratification data
+Table_stratif_fortnightly <- read.csv2('Table_stratif_fortnightly_20240923.csv', 
+                                     header = TRUE,
+                                     fileEncoding = 'ISO-8859-1')
+
+# Create a daily table for plotting the rugplot
+# We create a vector for 'Day of the year'
+Daily_basis <- expand_grid(Day = seq(1,365))
+# And one for 'Fortnight' that matches
+Daily_basis$Fortnight = as.vector(c(rep(1:26, each = 14), 26))
+# We add the site data
+Daily_basis <- expand_grid(Daily_basis,
+                           Code_point_Libelle = unique(Table_stratif_fortnightly$Code_point_Libelle))
+
+# We arrange Daily_basis by Site
+Daily_basis <- Daily_basis %>%
+  group_by(Code_point_Libelle, Day) %>%
+  arrange(Code_point_Libelle)
+
+# Nickel chrome!
+
+Table_stratif_daily <- left_join(Daily_basis, Table_stratif_fortnightly,
+                               by = c('Code_point_Libelle', 'Fortnight'),
+                               suffix  = c('','')) %>%
+  filter(is.na(SI_date.med) == FALSE) %>%
+  mutate(Code_point_Libelle = as.factor(Code_point_Libelle)) %>%
+  group_by(Day, Code_point_Libelle)
+
+# Let's save this stratification table for later
+# write.csv2(Table_stratif_daily, 'Table_stratif_daily_20240923.csv', row.names = FALSE,
 #            fileEncoding = 'ISO-8859-1')
 
 ### Plotting ####
@@ -880,11 +1006,11 @@ ggplot(gam_Dino.d_select) +
                                         color = 'grey10'),
         strip.text = element_text(color = 'grey5', size = 7.5))
 
-# Saving the temperature plot
+# Saving the salinity plot
 # ggsave('Dinoderiv_salinity_12sites_large.tiff', dpi = 300, height = 200, width = 250,
 #        units = 'mm', compression = 'lzw')
 
-# Now with salinity
+# Now with chl a
 ggplot(gam_Dino.d_select) +
   # First part of the plot: the rug plot
   # We use a color palette from the cmocean package
@@ -939,6 +1065,64 @@ ggplot(gam_Dino.d_select) +
                                         color = 'grey10'),
         strip.text = element_text(color = 'grey5', size = 7.5))
 
-# Saving the temperature plot
+# Saving the chl a plot
 # ggsave('Dinoderiv_chloroa_12sites_large.tiff', dpi = 300, height = 200, width = 250,
+#        units = 'mm', compression = 'lzw')
+
+# Now with the stratification index
+ggplot(gam_Dino.d_select) +
+  # First part of the plot: the rug plot
+  # We use a color palette from the cmocean package
+  scale_color_cmocean(name = 'tempo') +
+  geom_rug(data = Table_stratif_daily, aes(x = Day, color = SI_14d.med),
+           linewidth = .3,
+           length = unit(0.5, 'cm')
+  ) +
+  # Labels
+  labs(y = "1st derivative of Dinophysis GAM",
+       x = "Day of the year",
+       title = '1st derivative of Dinophysis GAM',
+       color = 'Stratification Index (-)'
+  ) +
+  # Change the color scale
+  new_scale_color() +
+  # Second part of plot: GAM derivatives
+  # Confidence interval
+  geom_ribbon(aes(x = data, ymin = lower, ymax = upper,
+                  color = Code_point_Libelle,
+                  fill = Code_point_Libelle), alpha = 0.2) +
+  # Derivative fit
+  geom_path(aes(x = data, y = derivative, 
+                color = Code_point_Libelle), lwd = 1) +
+  # Draw a line at 0 to separate accumulation from loss
+  geom_line(aes(x = data, y = 0), color = 'grey10', linewidth = .7) +
+  facet_wrap(facets = c('Code_point_Libelle')) + # , scales = 'free_y'
+  # Set the color palette :
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
+  # Theme
+  theme(plot.title = element_text(size = 11), 
+        # Axis
+        axis.title.x = element_text(size=10), 
+        axis.title.y =element_text(size=10), 
+        axis.text = element_text(size=8, color = 'black'),
+        axis.line.x = element_line(linewidth = .2, color = 'black'),
+        axis.line.y = element_line(linewidth = .2, color = 'black'),
+        # Legend
+        legend.background = element_rect(linewidth = .5, color = 'grey10'),
+        legend.title = element_text(size = 10, color = 'grey5'),
+        legend.frame = element_rect(linewidth = .5, color = 'grey10'),
+        legend.ticks = element_line(linewidth = .2, color = 'grey25'),
+        legend.position = 'bottom',
+        # Panel
+        panel.grid = element_blank(),
+        panel.background = element_blank(),
+        # Facet labels
+        strip.background = element_rect(fill = 'transparent',
+                                        linewidth = 1,
+                                        color = 'grey10'),
+        strip.text = element_text(color = 'grey5', size = 7.5))
+
+# Saving the stratification plot
+# ggsave('Dinoderiv_stratif_12sites_large.tiff', dpi = 300, height = 200, width = 250,
 #        units = 'mm', compression = 'lzw')
