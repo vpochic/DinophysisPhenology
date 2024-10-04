@@ -20,6 +20,9 @@
 ### Packages ####
 library(tidymodels)
 library(tidyverse)
+library(vip)
+library(ranger)
+
 ### Import data ####
 ## Part 1: Dinophysis sampling data ####
 # That's the file Season_Dino.csv with all sampling events in all sites for
@@ -120,15 +123,152 @@ Table_stratif <- read.csv2('Stratif_index_GAMAR_12sites.csv',
 # Let's join Season_Dino and stratif to see if this goes according to plan
 # (1 sampling event = 1 row in the stratif dataset)
 Table_data_RF <- left_join(Season_Dino_12sites, Table_stratif, 
-                           by = c('Target_Date', 'Code_point_Libelle'))
+                           by = c('Target_Date', 'Code_point_Libelle'),
+                           suffix = c('',''))
 
 # It works. It just works.
 
 # Now let's join the hydrology table
 
 Table_data_RF <- left_join(Table_data_RF, Table_hydro_select, 
-                           by = c('Code_point_Libelle', 'Date'))
+                           by = c('Code_point_Libelle', 'Date'),
+                           suffix = c('',''))
 
 # Fantastic
 
-# And now the tricky part: we project the derivative on every date based 
+# And now the tricky part: we project the derivative on every date based on the
+# calendar day.
+## Note: it would be even better to integrate the random effect of the year in
+# the future
+
+# First, we remove duplicates in the GAM derivatives dataset 
+# (because Year isn't included)
+gam_Dino.d_distinct <- distinct(gam_Dino.d)
+
+Table_data_RF <- left_join(Table_data_RF, gam_Dino.d_distinct, 
+                           by = c('Code_point_Libelle', 'Day'), suffix = c('',''))
+
+# Let's see how much data we have in each site
+ggplot(Table_data_RF) +
+  geom_histogram(aes(x = Code_point_Libelle, fill = Code_point_Libelle),
+                 stat = 'count') +
+  theme_classic()
+# That's a nice rainbow. It seems we have between 250 (Antifer, At so) and 400
+# (Auger, Le Cornard) data points. This seems ok.
+
+#### Applying the random forest model ####
+
+### Preparing model data ####
+
+# For the data table that we will use for the random forest, we only keep the
+# response variable (.derivative) and the predictor variables (TEMP, SALI,
+# CHLOROA, X.14.Day_Avergae_SI, Stratification_Index). Let's also try to keep
+# Code_point_Libelle to see if unmonitored local factors play a big role
+RF_data <- Table_data_RF %>%
+select(.derivative, TEMP, SALI, CHLOROA, X14.Day_Average_SI, 
+         Stratification_Index, Code_point_Libelle) %>%
+  # We drop any NA value in these variables
+  drop_na()
+
+# Did this modify the balance between sites?
+ggplot(RF_data) +
+  geom_histogram(aes(x = Code_point_Libelle, fill = Code_point_Libelle),
+                 stat = 'count') +
+  theme_classic()
+# Not really. just a little drop in Arcachon
+
+### We will split the dataset to have a training and a validation set
+splitdata_RF <- initial_split(RF_data)
+
+RF_train <- splitdata_RF %>%
+  training()
+
+RF_test <- splitdata_RF %>%
+  testing()
+
+# We set a seed to ensure that we get consistent results each time 
+# the code is run (because the split is randomly different each time)
+set.seed(234)
+
+# 'strata = .derivative' allows us to ensure that different levels of the 
+# response variable (the derivative in our case) are present in each fold 
+RF_train_folds <- vfold_cv(RF_train, strata = .derivative)
+
+RF_train_folds
+
+# This seems ok
+
+# We tell the recipe of the model (predict '.derivative' based on everything else,
+# and we convert our categorical variable ('Code_point_Libelle') into a dummy 
+# variable
+RF_recipe <- recipe(.derivative ~ ., data = RF_train) %>%
+  step_dummy(Code_point_Libelle)
+
+# We create a 'juiced' dataset with the recipe applied to it, for later on
+RF_juiced <- prep(RF_recipe) %>%
+  juice()
+
+# OK, next
+
+
+### Model building ####
+
+# We create a model object that we can tune
+tune_spec <- rand_forest(
+  mtry = tune(),
+  # number of trees
+  trees = 500,
+  min_n = tune()) %>%
+  # We set the mode as regression as we want to predict a continuous variable
+  set_mode('regression') %>%
+  set_engine('ranger')
+
+# Create a workflow in which we put the recipe and the model
+tune_wf <- workflow() %>%
+  add_recipe(RF_recipe) %>%
+  add_model(tune_spec)
+
+# We set the same seed as defined before
+set.seed(234)
+
+# This step takes some time
+tune_res <- tune_grid(
+  tune_wf,
+  resamples = RF_train_folds,
+  grid = 10)
+
+# Plotting the results of each fold using the RMSE
+tune_res %>%
+  collect_metrics() %>%
+  filter(.metric == 'rmse') %>%
+  select(mean, min_n, mtry) %>%
+  pivot_longer(min_n:mtry,
+               values_to = 'value',
+               names_to = 'parameter') %>%
+  ggplot(aes(x = value, y = mean, color = parameter)) +
+  geom_point(show.legend = FALSE) +
+  facet_wrap(~parameter, scales = 'free_x') +
+  labs(x = NULL, y = 'RMSE') +
+  theme_classic()
+
+# Use a function to select the best hyper parameters (min_n and mtry) for our
+# model
+best_rmse <- select_best(tune_res, metric = 'rmse')
+
+# Final random forest
+final_RF <- finalize_model(
+  tune_spec,
+  best_rmse)
+
+final_RF
+
+### Investigating the most important features of the model ####
+
+# keep the same seed
+set.seed(234)
+
+final_RF %>%
+  set_engine('ranger', importance = 'permutation') %>%
+  fit(.derivative~., data = RF_juiced) %>%
+  vip(geom = 'point') +
+  theme_classic()

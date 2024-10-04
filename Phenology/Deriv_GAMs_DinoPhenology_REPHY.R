@@ -1,6 +1,6 @@
 #### Derivatives of fitted GAMs for Dinophysis phenology ##
 ### V. POCHIC
-# 2024-10-03
+# 2024-10-04
 
 # /!\ This script requires data tables generated with the 'GAM Dino unified more sites' 
 # and 'GAM Meso unified' AND Dino_phenology_heatmaps scripts /!\
@@ -237,8 +237,8 @@ gam_Dino.d <- derivatives(# The object of which we want to calculate derivatives
 
 # It works!
 # Save the file
-# write.csv2(gam_Dino.d, 'Derivatives_GAM_Dino_12sites_20241003.csv', 
-#            row.names = FALSE)
+# write.csv2(gam_Dino.d, 'Derivatives_GAM_Dino_12sites_20241003.csv',
+#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
 # Let's try to plot that shall we
 
 ### Plotting
