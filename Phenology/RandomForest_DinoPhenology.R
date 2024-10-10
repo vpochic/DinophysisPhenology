@@ -162,7 +162,7 @@ ggplot(Table_data_RF) +
 
 # For the data table that we will use for the random forest, we only keep the
 # response variable (.derivative) and the predictor variables (TEMP, SALI,
-# CHLOROA, X.14.Day_Avergae_SI, Stratification_Index). Let's also try to keep
+# CHLOROA, X.14.Day_Average_SI, Stratification_Index). Let's also try to keep
 # Code_point_Libelle to see if unmonitored local factors play a big role
 RF_data <- Table_data_RF %>%
 select(.derivative, TEMP, SALI, CHLOROA, X14.Day_Average_SI, 
@@ -272,3 +272,163 @@ final_RF %>%
   fit(.derivative~., data = RF_juiced) %>%
   vip(geom = 'point') +
   theme_classic()
+
+# We got a nice plot of variable importance!
+# But we want one that integrates the random nature of the model
+# (i.e., we want error bars)
+
+# The idea here is to run the model 20 times on 20 different seeds, 
+# and to collect the variable importance data each time, so we can plot them 
+# at the end.
+
+# The for loop will include exactly the same code as before, the only thing that 
+# will change every time is the seed
+
+# We also need to create a dataframe to store the results
+
+# Get the variables from the model
+vip_info <- final_RF %>%
+  set_engine('ranger', importance = 'permutation') %>%
+  fit(.derivative~., data = RF_juiced)
+
+# Convert it as tibble to get a vector of names
+vip_tibble <- as_tibble(vip_info$fit$variable.importance, rownames = 'Variable')
+
+dataplot_vip <- as_tibble_col(vip_tibble$Variable, column_name = 'Variable')
+# Nice!
+rm(vip_info)
+rm(vip_tibble)
+
+# A big ugly for loop to run 20 iterations of the model
+# (this step takes some time, obviously)
+
+for (i in 1:20) {
+  set.seed(i)
+  
+  # 'strata = .derivative' allows us to ensure that different levels of the 
+  # response variable (the derivative in our case) are present in each fold 
+  RF_train_folds <- vfold_cv(RF_train, strata = .derivative)
+  
+  RF_train_folds
+  
+  # This seems ok
+  
+  # We tell the recipe of the model (predict '.derivative' based on everything else,
+  # and we convert our categorical variable ('Code_point_Libelle') into a dummy 
+  # variable
+  RF_recipe <- recipe(.derivative ~ ., data = RF_train) %>%
+    step_dummy(Code_point_Libelle)
+  
+  # We create a 'juiced' dataset with the recipe applied to it, for later on
+  RF_juiced <- prep(RF_recipe) %>%
+    juice()
+  
+  # OK, next
+  
+  # We create a model object that we can tune
+  tune_spec <- rand_forest(
+    mtry = tune(),
+    # number of trees
+    trees = 500,
+    min_n = tune()) %>%
+    # We set the mode as regression as we want to predict a continuous variable
+    set_mode('regression') %>%
+    set_engine('ranger')
+  
+  # Create a workflow in which we put the recipe and the model
+  tune_wf <- workflow() %>%
+    add_recipe(RF_recipe) %>%
+    add_model(tune_spec)
+  
+  # We set the same seed as defined before
+  set.seed(i)
+  
+  # This step takes some time
+  tune_res <- tune_grid(
+    tune_wf,
+    resamples = RF_train_folds,
+    grid = 10)
+  
+  # Use a function to select the best hyper parameters (min_n and mtry) for our
+  # model
+  best_rmse <- select_best(tune_res, metric = 'rmse')
+  
+  # Final random forest
+  final_RF <- finalize_model(
+    tune_spec,
+    best_rmse)
+
+  # Re-run the model on same seed and store the info in a "passerelle" object
+  set.seed(i)
+  
+  passerelle_RF <- final_RF %>%
+    set_engine('ranger', importance = 'permutation') %>%
+    fit(.derivative~., data = RF_juiced)
+
+  # Append the variable importance at the end of the tibble we constructed 
+  # before
+  # 1st, build a tibble with the var importance and the variables
+  added_tibble <- as_tibble(passerelle_RF$fit$variable.importance, 
+                                rownames = 'Variable')
+  # 2nd, left_join with our existing dataframe by 'Variable' with appropriate
+  # suffix
+  dataplot_vip <- left_join(x = dataplot_vip, y = added_tibble, 
+                            by = c('Variable'), 
+                            suffix = c('',as.character(i)))
+  
+}
+
+# Save the result!
+# write.csv2(dataplot_vip, 'Randomforest_vip_data_20241010.csv', row.names = FALSE)
+
+## Variable importance plot ####
+
+# We pivot longer the values of variable importance to get tidy data
+
+dataplot_vip_tidy <- pivot_longer(dataplot_vip, cols = -c('Variable'), 
+                                  names_to ='Seed') %>%
+  group_by(Variable)
+
+# To make a nice plot, we need to order the variables by order of importance
+# So we calculate the median for each
+dataplot_vip_median <- dataplot_vip_tidy %>%
+  summarise(value.median = median(value), .groups = 'keep') %>%
+  arrange(desc(value.median))
+
+# Nice. Now reorder the factor
+dataplot_vip_tidy <- dataplot_vip_tidy %>%
+  mutate(Variable = as_factor(Variable)) %>%
+  # relevel the factor in descending order of variable importance
+  mutate(Variable = fct_relevel(Variable, 'TEMP', 'CHLOROA', 'SALI', 
+                                "X14.Day_Average_SI", 
+                                "Code_point_Libelle_Ouest.Loscolo",
+                                "Stratification_Index",
+                                "Code_point_Libelle_Arcachon...Bouée.7",
+                                "Code_point_Libelle_Cabourg",
+                                "Code_point_Libelle_Auger",
+                                "Code_point_Libelle_Men.er.Roue",
+                                "Code_point_Libelle_Le.Cornard",
+                                "Code_point_Libelle_Teychan.bis",
+                                "Code_point_Libelle_At.so",
+                                "Code_point_Libelle_les.Hébihens",
+                                "Code_point_Libelle_Point.1.Boulogne",
+                                "Code_point_Libelle_Loguivy"))
+
+# Plot
+ggplot(data = dataplot_vip_tidy, aes(x = Variable, y = value)) +
+  # A dot plot
+  geom_point(position = position_jitter(width = .1),
+             color = 'dodgerblue3', alpha = .4) +
+  # With a boxplot as overlay
+  geom_boxplot(fill = 'transparent', color = 'dodgerblue4', outliers = FALSE) +
+  # Custom label for y axis
+  labs(x = NULL, y = 'Variable importance') +
+  # Flip x and y axes
+  coord_flip() +
+  # Reverse x axis so most important variable appears at the top
+  scale_x_discrete(limits = rev) +
+  theme_classic()
+
+# Save the plot
+ggsave('VIP_RandomForest_20241010.tiff', width = 225, height = 170, units = 'mm',
+       compression = 'lzw', dpi = 300)
