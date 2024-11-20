@@ -1,6 +1,6 @@
 ###### GAM for Dinophysis phenology with mgcv - unified 2 ###
 ## V. POCHIC
-# 2024-09-23
+# 2024-11-20
 
 # In this version of the script we add the sites in Pas de Calais 
 # ('Point 1 Boulogne' and 'At so') and in Northern Britanny ('les Hébihens' and 
@@ -394,8 +394,12 @@ Season_Dino <- filter(Season_Dino, Dinophysis_genus %% 10 == 0)
 
 # Formulate the GAM
 
+# We will use the Year as a random effect and for this we need it as a factor
+Season_Dino_factor <- Season_Dino %>%
+  mutate(Year = as_factor(Year))
 
-gam_Dino <- gam(data = Season_Dino, 
+
+gam_Dino <- gam(data = Season_Dino_factor, 
                 # Only a spline for the day of the year
                 # The use of a cyclic basis spline helps to make ends meet at the
                 # first and last days of the year
@@ -438,7 +442,8 @@ ilink <- gam_Dino$family$linkinv
 gam_Dino_newdata <- bind_cols(gam_Dino_newdata, 
                               setNames(as_tibble(
                                 predict(gam_Dino, gam_Dino_newdata, 
-                                        se.fit = TRUE, type = 'link')[1:2]),
+                                        se.fit = TRUE, type = 'link',
+                                        re.form = ~ 1|Year)[1:2]),
                                 c('fit_link','se_link')))
 
 ## Create the 95% confidence interval (2*standard error fit) and backtransform 
@@ -469,6 +474,10 @@ ggplot(gam_Dino_newdata, aes(x = Day, y = fit_resp))+
 # Saving plot
 # ggsave('gam_Dino_OL_all.tiff', dpi = 300, height = 120, width = 160, 
 #        units = 'mm', compression = 'lzw')
+
+# Saving data to make another plot in another script
+# write.csv2(gam_Dino_newdata, 'gam_Dino_multiyear_data.csv', row.names = FALSE,
+#            fileEncoding = 'ISO-8859-1')
 
 ### Checking the model
 ModelOutputs<-data.frame(Fitted=fitted(gam_Dino),
@@ -742,8 +751,12 @@ pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered',
                      '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
 
 # Import 'response_pred_plot' if necessary
-response_pred_plot <- read.csv2('response_pred_plot_20240813_16sites.csv',
+response_pred_plot <- read.csv2('response_pred_plot_20240813_14sites.csv',
                                 header = TRUE, fileEncoding = 'ISO-8859-1')
+
+# And Season_Dino
+Season_Dino <- read.csv2('Season_Dino.csv',
+                         header = TRUE, fileEncoding = 'ISO-8859-1')
 
 # Reordering the factor 'Code_point_Libelle' so that the sites appear in the
 # plot in the desired order
@@ -774,11 +787,11 @@ Season_Dino <- Season_Dino %>%
 # Crop out highest data points of each site to have better view of the model
 Season_Dino_crop <- Season_Dino %>%
   # Point 1 Boulogne
-  filter(ifelse(true_count > 2 & Code_point_Libelle == 'Point 1 Boulogne',
-                # if condition met, drop the line
-                FALSE,
-                # else, keep the line
-                TRUE)) %>%
+  # filter(ifelse(true_count > 2 & Code_point_Libelle == 'Point 1 Boulogne',
+  #               # if condition met, drop the line
+  #               FALSE,
+  #               # else, keep the line
+  #               TRUE)) %>%
   # Antifer
   filter(ifelse(true_count > 50 & Code_point_Libelle == 'Antifer ponton pétrolier',
                 # if condition met, drop the line
@@ -863,6 +876,9 @@ ggplot(response_pred_plot, aes(x = Day, y = median.fit,
   geom_path(lwd = 1) +
   # scale_y_continuous(limits = c(0,40)) +
   geom_point(data = Season_Dino_crop, aes(x = Day, y = true_count), 
+             size = .8, alpha = .5) +
+  # Add a "ghost point" to force the minimum y-axis range to 5
+  geom_point(aes(x = 1, y = 5), color = 'transparent', fill = 'transparent',
              size = .8, alpha = .5) +
   labs(y = "Dinophysis cells observed",
        x = "Day of the year",
@@ -1096,30 +1112,6 @@ ggplot(qq_data)+
 
 # It matches! great!
 
-# Now for the "official" qq plot, with color of the points depending on site
-# Color palette
-# Blues for Northern Brittany: '#0A1635', '#2B4561'
-# Terra cotta for Pas de Calais: 'sienna4', 'tan3'
-pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered', 
-                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
-                     '#1F3700', '#649003','#F7B41D', '#FBB646',
-                     '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
-
-# We need to reorder the factor 'Code_point_Libelle' so the sites appear in the
-# order we want
-qq_data_reordered <- qq_data %>%
-  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
-                                          'Point 1 Boulogne', 'At so',
-                                          'Antifer ponton pétrolier', 'Cabourg',
-                                          'les Hébihens', 'Loguivy',
-                                          'Men er Roue', 'Ouest Loscolo',
-                                          'Le Cornard', 'Auger',
-                                          'Arcachon - Bouée 7', 'Teychan bis',
-                                          'Parc Leucate 2', 'Bouzigues (a)',
-                                          'Sète mer', 'Diana centre')) %>%
-  # we ungroup the data frame to produce only 1 qq-plot
-  ungroup()
-
 # And (qq-)plot
 qqplot_custom <- ggplot(qq_data) +
   stat_qq(aes(sample=Residuals), color = '#2156A1', alpha = .7) +
@@ -1157,6 +1149,45 @@ HistRes_custom
 # Save the plot
 # ggsave('HistRes_custom_16sites.tiff', dpi = 300, height = 175, width = 250,
 #                units = 'mm', compression = 'lzw')
+
+# Plotting the whole model
+
+# Adding the date variable
+# To do this, we will exploit the fact that adding a number to an object of type
+# 'Date' just adds the appropriate number of days.
+gam_Dino_OL_newdata <- gam_Dino_OL_newdata %>%
+  # Create a month and day character variable, that is always '01-01'
+  mutate(MonthDay = '01-01') %>%
+  # Then unite it with Year to create something that will resemble a ymd date
+  mutate(CharYear = as.character(Year)) %>%
+  unite(Date, CharYear, MonthDay, sep = '-') %>%
+  # And make it a 'Date' object
+  mutate(Date = ymd(Date)) %>%
+  # Now, add Day-1 to each
+  mutate(Date = Date + (as.numeric(Day)-1))
+
+# Ouest Loscolo
+ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_OL_newdata, aes(x = Date, ymin = right_lwr, 
+                                     ymax = right_upr),
+              color = '#7F96B6',
+              fill = '#BBD4F2',
+              linewidth = .75, alpha = .8) +
+  geom_line(data = gam_Dino_OL_newdata, aes(x = Date, y = fit_resp),
+            linewidth = 1,
+            color = '#435E7B') +
+  # plot the data
+  geom_point(data = trueData_OL, aes(x = Date, y = true_count),
+             color = '#11203E', size = 4,
+             alpha = .3) +
+  # x axis as date and adding limits
+  scale_x_date() +
+  # cut the y scale at 22
+  scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(x = 'Date', y = 'Dinophysis cells observed in 10 mL') +
+  theme_classic()
 
 #### Plotting additional components of the GAM ####
 
@@ -1210,6 +1241,8 @@ EvaluateSmooths = function(model, select=NULL, x=NULL, n=100) {
 
 # Call the function on the desired GAM
 gamOL_smooths = EvaluateSmooths(gam_Dino_OL)
+# In case we want only the smooth for the predictor 'Day'
+gamOL_smooths_Day = filter(gamOL_smooths, x.var == 'Day')
 
 # Plot the smooths for variables Day and Year
 ggplot(gamOL_smooths, aes(x.val, value)) + 
@@ -1225,14 +1258,14 @@ ggplot(gamOL_smooths, aes(x.val, value)) +
 # We use the 'basis' function from package gratia
 basisOL <- basis(gam_Dino_OL)
 # Let's say we only want basis functions for the 'Day' variable
-basisOL_day <- filter(basisOL, smooth == 's(Day)')
+basisOL_day <- filter(basisOL, .smooth == 's(Day)')
 
 # Define a nice color palette (from the Bretagne color palettes!)
 palette_splines8 <- c('#0A1635', '#76A7E2', '#FBA823', '#8D6456',
                       '#8B064B', '#FF6448', '#649003', '#1F3700')
 
 # Plot the basis functions for variable Day
-ggplot(basisOL_day, aes(x = Day, y = ilink(value), color = bf)) + 
+ggplot(basisOL_day, aes(x = Day, y = ilink(.value), color = .bf)) + 
   geom_line(linewidth = .75, alpha = .8) +
   scale_color_discrete(type = palette_splines8, guide = 'none') +
   labs(x = 'Calendar day', y = 'Basis spline value', 
@@ -1259,7 +1292,7 @@ ggplot(basisOL_day, aes(x = Day, y = ilink(value), color = bf)) +
 # dpi = 300, unit = 'mm', compression = 'lzw')
 
 # Second step, plotting the basis functions of the GAM
-ggplot(basisOL_day, aes(x = Day, y = ilink(value), color = bf)) +
+ggplot(basisOL_day, aes(x = Day, y = ilink(.value), color = .bf)) +
   # plot the data
   geom_point(data = plotDino_OL, aes(x=Day, y=true_count), 
              color = '#2156A1', size = 3,
@@ -1280,7 +1313,7 @@ ggplot(basisOL_day, aes(x = Day, y = ilink(value), color = bf)) +
 
 # Third step, with the smooth
 # /!\ This step uses objects defined in the previous section of the script /!\
-ggplot(basisOL_day, aes(x = Day, y = ilink(value), color = bf)) +
+ggplot(basisOL_day, aes(x = Day, y = ilink(.value), color = .bf)) +
   # plot the data
   geom_point(data = plotDino_OL, aes(x=Day, y=true_count), 
              color = '#2156A1', size = 3,
@@ -1304,5 +1337,84 @@ ggplot(basisOL_day, aes(x = Day, y = ilink(value), color = bf)) +
   theme_classic()
 
 # Save the plot (step 3)
-# ggsave('educGAM_step3.tiff', height = 150, width = 300,
+# ggsave('educGAM_step3_frontslide.tiff', height = 300, width = 900,
 # dpi = 300, unit = 'mm', compression = 'lzw')
+
+# Fourth step, only the final GAM smooth
+# /!\ This step uses objects defined in the previous section of the script /!\
+ggplot() +
+  # plot the data
+  geom_point(data = plotDino_OL, aes(x=Day, y=true_count), 
+             color = '#2156A1', size = 3,
+             alpha = .3) +
+  # plot the smooth
+  geom_line(data = gamOL_smooths_Day, aes(x.val, ilink(value)),
+            color = '#2156A1', linewidth = 1.5) +
+  # And the std error
+  geom_line(data = gamOL_smooths_Day, aes(x = x.val, y=ilink(value + 2*se)), 
+            linetype="dashed", color = '#2156A1', alpha = .8, linewidth = 1) + 
+  geom_line(data = gamOL_smooths_Day, aes(x = x.val, y=ilink(value - 2*se)), 
+            linetype="dashed", color = '#2156A1', alpha = .8, linewidth = 1) + 
+  # cut the y scale at 20
+  scale_y_continuous(limits = c(0,20)) +
+  # Text
+  labs(x = 'Calendar day', y = 'Dinophysis cells observed in 10 mL') +
+  theme_classic()
+
+ggplot() +
+  # plot the data
+  geom_point(data = plotDino_OL, aes(x=Day, y=true_count), 
+             color = '#2156A1', size = 3,
+             alpha = .3) +
+  # plot the smooth
+  geom_line(data = gamOL_smooths_Day, aes(x.val, ilink(value)),
+            color = '#2156A1', linewidth = 1.5) +
+  # And the std error
+  geom_line(data = gamOL_smooths_Day, aes(x = x.val, y=ilink(value + 2*se)), 
+            linetype="dashed", color = '#2156A1', alpha = .8, linewidth = 1) + 
+  geom_line(data = gamOL_smooths_Day, aes(x = x.val, y=ilink(value - 2*se)), 
+            linetype="dashed", color = '#2156A1', alpha = .8, linewidth = 1) +
+  # cut the y scale at 20
+  scale_y_continuous(limits = c(0,20)) +
+  # Text
+  labs(x = 'Calendar day', y = 'Dinophysis cells observed in 10 mL') +
+  theme_classic()
+
+# Save the plot (step 4)
+# ggsave('educGAM_step4.tiff', height = 150, width = 300,
+# dpi = 300, unit = 'mm', compression = 'lzw')
+
+#### Plotting the GAM on the different years ####
+## The logic here is to see how well the GAM fits the data year by year
+# Can we see some years where the phenology significantly deviates from
+# what the GAM predicts?
+## Ouest Loscolo ####
+response_pred_plot <- read.csv2('response_pred_plot_20240813_14sites.csv', 
+                                header = TRUE, fileEncoding = 'ISO-8859-1')
+
+rpp_OL <- filter(response_pred_plot, Code_point_Libelle == 'Ouest Loscolo')
+Season_Dino_OL <- filter(Season_Dino, Code_point_Libelle == 'Ouest Loscolo')
+
+ggplot(Season_Dino_OL, aes(x = Day, y = true_count)) +
+  geom_point(color = 'dodgerblue3', alpha = .8) +
+  geom_line(data = rpp_OL, aes(x = Day, y = median.fit), color = 'dodgerblue3') +
+  geom_ribbon(data = rpp_OL, aes(x = Day, y = median.fit,
+                                 ymin = lwrS, ymax = uprS), 
+              color = 'dodgerblue3', alpha = 0.2) +
+  facet_wrap(facets = c('Year'), scales = 'free_y') +
+  # scale_y_continuous(limits = c(0,30)) +
+  theme_classic()
+## Cabourg ####
+
+rpp_Cab <- filter(response_pred_plot, Code_point_Libelle == 'Cabourg')
+Season_Dino_Cab <- filter(Season_Dino, Code_point_Libelle == 'Cabourg')
+
+ggplot(Season_Dino_Cab, aes(x = Day, y = true_count)) +
+  geom_point(color = 'orangered', alpha = .8) +
+  geom_line(data = rpp_Cab, aes(x = Day, y = median.fit), color = 'orangered') +
+  geom_ribbon(data = rpp_Cab, aes(x = Day, y = median.fit,
+                                 ymin = lwrS, ymax = uprS), 
+              color = 'orangered', alpha = 0.2) +
+  facet_wrap(facets = c('Year'), scales = 'free_y') +
+  # scale_y_continuous(limits = c(0,30)) +
+  theme_classic()

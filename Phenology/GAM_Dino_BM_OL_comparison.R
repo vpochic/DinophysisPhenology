@@ -1,5 +1,5 @@
 ### A Dinophysis GAM at Basse Michaud ###
-# V. POCHIC - 2024-15-11
+# V. POCHIC - 2024-11-20
 
 
 #### Packages ####
@@ -18,13 +18,21 @@ library(grid)
 
 Season_Dino_BM <- read.csv2('Season_Dino_BM.csv', header = TRUE, 
                             fileEncoding = 'ISO-8859-1')
-plotDino_BM <- filter(Season_Dino_BM, (Code_point_Libelle == 'Basse Michaud'))
+plotDino_BM <- filter(Season_Dino_BM, (Code_point_Libelle == 'Basse Michaud')) %>%
+  mutate(Date = as_date(Date))
 plotDino_OL_select <- filter(Season_Dino_BM, (Code_point_Libelle == 'Ouest Loscolo')
-                             & (Year >= 2016))
+                             & (Year >= 2016)) %>%
+  mutate(Date = as_date(Date))
 
 #### Dinophysis GAM at Basse Michaud ####
 
-gam_Dino_BM <- gam(data = plotDino_BM, 
+# Putting Year as a factor
+plotDino_BM_factor <- plotDino_BM %>%
+  mutate(Year = as_factor(Year)) %>%
+  mutate(Year = fct_relevel(Year, '2016', '2017', '2018', '2019', '2020', 
+                            '2021', '2022'))
+
+gam_Dino_BM <- gam(data = plotDino_BM_factor, 
                    # Only a spline for the day of the year
                    # The use of a cyclic basis spline helps to make ends meet at the
                    # first and last days of the year
@@ -51,8 +59,8 @@ gam.check(gam_Dino_BM)
 gam_Dino_BM_newdata <- expand_grid(Day=seq(1, 365),
                                    # We add a Year vector as it has become a factor
                                    # of the model
-                                   Year=seq(min(Season_Dino_BM$Year), 
-                                            max(Season_Dino_BM$Year)))
+                                   Year=seq(min(plotDino_BM$Year), 
+                                            max(plotDino_BM$Year)))
 
 ## Get the inverse link function of the model
 # With this function, we can transform the prediction we make on the link
@@ -185,9 +193,36 @@ ggplot() +
   labs(title = 'Basse Michaud', x = 'Date', y = 'Dinophysis cells observed in 10 mL') +
   theme_classic()
 
+# With the date as x axis
+ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_BM_newdata, aes(x = Date, ymin = right_lwr, 
+                                              ymax = right_upr),
+              color = 'orangered',
+              fill = 'orange',
+              linewidth = .75, alpha = .8) +
+  geom_line(data = gam_Dino_BM_newdata, aes(x = Date, y = fit_resp),
+            linewidth = 1,
+            color = 'darkred') +
+  # plot the data
+  geom_point(data = plotDino_BM, aes(x = Date, y = true_count),
+             color = 'firebrick1', size = 4,
+             alpha = .3) +
+  # cut the y scale at 22
+  #scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(title = 'Basse Michaud', x = 'Date', y = 'Dinophysis cells observed in 10 mL') +
+  theme_classic()
+
 ## Ouest Loscolo for comparison ####
 
-gam_Dino_OL <- gam(data = plotDino_OL_select, 
+# Putting Year as a factor
+plotDino_OL_factor <- plotDino_OL_select %>%
+  mutate(Year = as_factor(Year)) %>%
+  mutate(Year = fct_relevel(Year, '2016', '2017', '2018', '2019', '2020', 
+                            '2021', '2022'))
+
+gam_Dino_OL <- gam(data = plotDino_OL_factor, 
                    # Only a spline for the day of the year
                    # The use of a cyclic basis spline helps to make ends meet at the
                    # first and last days of the year
@@ -214,8 +249,8 @@ gam.check(gam_Dino_OL)
 gam_Dino_OL_newdata <- expand_grid(Day=seq(1, 365),
                                    # We add a Year vector as it has become a factor
                                    # of the model
-                                   Year=seq(min(Season_Dino_BM$Year), 
-                                            max(Season_Dino_BM$Year)))
+                                   Year=seq(min(plotDino_OL_select$Year), 
+                                            max(plotDino_OL_select$Year)))
 
 ## Get the inverse link function of the model
 # With this function, we can transform the prediction we make on the link
@@ -345,6 +380,28 @@ ggplot() +
   geom_point(data = plotDino_OL_select, aes(x = Day, y = true_count),
              color = '#11203E', size = 4,
              alpha = .3) +
+  # cut the y scale at 22
+  #scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(title = 'Ouest Loscolo (2016-2022)', x = NULL, y = NULL) +
+  theme_classic()
+
+# Plotting with date
+ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_OL_newdata, aes(x = Date, ymin = right_lwr, 
+                                              ymax = right_upr),
+              color = '#7F96B6',
+              fill = '#BBD4F2',
+              linewidth = .75, alpha = .8) +
+  geom_line(data = gam_Dino_OL_newdata, aes(x = Date, y = fit_resp),
+            linewidth = 1,
+            color = '#435E7B') +
+  # plot the data
+  geom_point(data = plotDino_OL_select, aes(x = Date, y = true_count),
+             color = '#11203E', size = 4,
+             alpha = .3) +
+  # scale_x_date() +
   # cut the y scale at 22
   #scale_y_continuous(limits = c(0,22)) +
   # Text
