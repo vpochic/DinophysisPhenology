@@ -1,11 +1,11 @@
 ###### GAM for Mesodinium phenology with mgcv - unified ###
 ## V. POCHIC
-# 2024-04-18
+# 2024-11-21
 
 #### Packages and functions ####
 library(tidyverse)
-library(ggplot2)
 library(mgcv)
+library(gratia)
 library(viridis)
 library(nlme)
 
@@ -21,8 +21,12 @@ Table_phyto_taxon <- read.csv2('Table1_phyto_taxon.csv', fileEncoding = "ISO-885
 
 # Select only stations of interest from 2006 --> 2022
 Table_phyto_OL <- filter(Table_phyto_taxon, Code_point_Libelle %in% 
-                           c(# Baie de Seine
+                           c(# Pas de Calais
+                             'Point 1 Boulogne', 'At so',
+                             # Baie de Seine
                              'Antifer ponton pétrolier', 'Cabourg',
+                             # Bretagne Nord
+                             'les Hébihens', 'Loguivy',
                              # Bretagne Sud
                              'Men er Roue', 'Ouest Loscolo',
                              # Pertuis charentais
@@ -30,10 +34,10 @@ Table_phyto_OL <- filter(Table_phyto_taxon, Code_point_Libelle %in%
                              # Arcachon
                              'Arcachon - Bouée 7', 'Teychan bis',
                              # Mediterranée
-                             'Parc Leucate 2', 'Bouzigues (a)', 'Sète mer', 
+                             'Parc Leucate 2', 'Bouzigues (a)', 'Sète mer',
                              'Diana centre')
                          ) %>%
-  filter(Year >= 2007)
+  filter(Year >= 2007 & Year <= 2022)
 
 #### More zeros ####
 
@@ -86,9 +90,8 @@ Season_Meso <- Table_Meso_zeros %>%
   # distribution, contrary to Dinophysis_genus because the conversion from
   # 10 mL to 1L (*100) prevents some intermediate values (e.g., 150 cells.L-1)
   mutate(true_count = Mesodinium_genus/100) %>%
-  # Filter out exceptionnaly high counts (>500 cells observed in 10 mL)
-  # this represents 3 events (2 in Antifer and 1 in Cabourg)
-  # filter(true_count < 500) %>%
+  # Exclude extremely high counts (1 occurence in Cabourg of 800 counted cells)
+  filter(true_count < 500) %>%
   # converting the site to factor for the model
   mutate(Code_point_Libelle = as.factor(Code_point_Libelle))
 
@@ -107,6 +110,10 @@ hist(Season_Meso$Day, breaks = 26)
 # (Christmas + NY's eve)
 
 # This seems quite fine!!!
+
+# Let's save that
+# write.csv2(Season_Meso, 'Season_Meso.csv', row.names = FALSE,
+#            fileEncoding = "ISO-8859-1")
 
 #### Where the zeros lie ####
 
@@ -302,12 +309,17 @@ rm(test)
 #### Model and basic model checks ####
 # Formulate the GAM
 
-Season_Meso <- filter(Season_Meso, Code_point_Libelle != 'Parc Leucate 2'
+# Remove sites where we have only zeros (unmanageable for the model)
+Season_Meso_filter <- filter(Season_Meso, Code_point_Libelle != 'Parc Leucate 2'
                        & Code_point_Libelle != 'Sète mer')
                       # Only zeros in these sites (not suitable for a Poisson
                       # distribution)
 
-gam_Meso <- gam(data = Season_Meso, 
+# Transform Year as a factor for the random effect
+Season_Meso_factor <- Season_Meso_filter %>%
+  mutate(Year = as_factor(Year))
+
+gam_Meso <- gam(data = Season_Meso_factor, 
                 # Only a spline for the day of the year
                 # The use of a cyclic basis spline helps to make ends meet at the
                 # first and last days of the year
@@ -339,7 +351,9 @@ gam_Meso_newdata <- expand_grid(Day=seq(1, 365),
                                 Year=seq(min(Season_Meso$Year), 
                                         max(Season_Meso$Year)),
                                 # We also add the site data
-                                Code_point_Libelle = unique(Season_Meso$Code_point_Libelle))
+                                Code_point_Libelle = unique(Season_Meso$Code_point_Libelle)) %>%
+  # And we need to remove the 2 sites that aren't in the model
+  filter(Code_point_Libelle != 'Sète mer' & Code_point_Libelle != 'Parc Leucate 2')
 
 ## Get the inverse link function of the model
 # With this function, we can transform the prediction we make on the link
@@ -375,7 +389,7 @@ ggplot(gam_Meso_newdata, aes(x = Day, y = fit_resp))+
   geom_line(linewidth = 1) +
   geom_point(data = Season_Meso, aes(x = Day, y = true_count, color = Year), shape = 21) +
   scale_color_viridis_c('Year') +
-  facet_wrap(facets = c('Code_point_Libelle')) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
   theme_classic()
 
 # Saving plot
@@ -386,24 +400,90 @@ ggplot(gam_Meso_newdata, aes(x = Day, y = fit_resp))+
 ModelOutputs<-data.frame(Fitted=fitted(gam_Meso),
                          Residuals=resid(gam_Meso))
 
-# P3 is residuals vs fitted
-p3<-ggplot(ModelOutputs)+
-  geom_point(aes(x=Fitted,y=Residuals))+
-  theme_classic()+
+# We're gonna make our own qq plot with colors identifying sites
+# We base it on the structure of the model
+qq_data <- gam_Meso$model
+# then we add the values of fitted and residuals 
+# (but are they in the same order as the model? -> need to check that)
+qq_data <- bind_cols(qq_data, ModelOutputs)
+
+# Plot : verify that true data matches (more or less) model fit
+ggplot(qq_data)+
+  geom_point(aes(x = Day, y = true_count), color = 'red') +
+  geom_point(aes(x = Day, y = Fitted), color = 'blue') +
+  facet_wrap(facets = c('Code_point_Libelle')) +
+  theme_classic() +
+  labs(y = "Mesodinium count", x = "Calendar day")
+
+# It matches! great!
+
+# Now for the "official" qq plot, with color of the points depending on site
+# Color palette
+# Blues for Northern Brittany: '#0A1635', '#2B4561'
+# Terra cotta for Pas de Calais: 'sienna4', 'tan3'
+pheno_palette14 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646',
+                     '#DEB1CC', '#791D40')
+
+# We need to reorder the factor 'Code_point_Libelle' so the sites appear in the
+# order we want
+qq_data_reordered <- qq_data %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Bouzigues (a)', 'Diana centre')) %>%
+  # we ungroup the data frame to produce only 1 qq-plot
+  ungroup()
+
+# And (qq-)plot
+qqplot_custom <- ggplot(qq_data_reordered) +
+  stat_qq(aes(sample=Residuals, color = Code_point_Libelle), alpha = .7) +
+  stat_qq_line(aes(sample=Residuals, color = Code_point_Libelle)) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  scale_color_discrete(type = pheno_palette14, guide = 'none') +
+  theme_classic() +
+  labs(y="Sample Quantiles",x="Theoretical Quantiles")
+
+qqplot_custom
+
+# Save the plot
+# ggsave('qqplot_custom_Meso_14sites.tiff', dpi = 300, height = 175, width = 250,
+#                units = 'mm', compression = 'lzw')
+
+# We can do the same for residuals vs fitted
+RvFplot_custom <- ggplot(qq_data_reordered)+
+  geom_point(aes(x = Fitted, y = Residuals, color = Code_point_Libelle), 
+             alpha = .7) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free') +
+  scale_color_discrete(type = pheno_palette14, guide = 'none') +
+  theme_classic() +
   labs(y="Residuals",x="Fitted Values")
 
-# P4 is the qq-plot
-p4<-ggplot(ModelOutputs) +
-  stat_qq(aes(sample=Residuals))+
-  stat_qq_line(aes(sample=Residuals))+
-  theme_classic()+
-  labs(y="Sample Quartiles",x="Theoretical Quartiles")
+RvFplot_custom
 
-p3
-# Resid. vs fitted plot is approximately ok, even if there are some structures
-# due to the weights applied
-p4
-# QQ-plot is quite shit.
+# Save the plot
+# ggsave('RvFplot_custom_Meso_14sites.tiff', dpi = 300, height = 175, width = 250,
+#                units = 'mm', compression = 'lzw')
+
+# And let's do one last diagnostic plot with histogram of residuals
+HistRes_custom <- ggplot(qq_data_reordered, aes(x = Residuals, 
+                                                fill = Code_point_Libelle))+
+  geom_histogram(binwidth = 1)+
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free') +
+  scale_fill_discrete(type = pheno_palette14, guide = 'none') +
+  theme_classic() +
+  labs(x='Residuals', y = 'Count')
+
+HistRes_custom
+
+# Save the plot
+# ggsave('HistRes_custom_Meso_14sites.tiff', dpi = 300, height = 175, width = 250,
+#                units = 'mm', compression = 'lzw')
 
 
 #### Confidence intervals ####
@@ -431,24 +511,24 @@ rmvn <- function(n, mu, sig) { ## MVN random deviates
 # smoothing parameters being estimated rather than known values)
 Vb <- vcov(gam_Meso)
 # New data
-newd <- with(Season_Meso, data.frame(Day = rep(seq(1, 365, length = 365),
+newd <- with(Season_Meso_filter, data.frame(Day = rep(seq(1, 365, length = 365),
                                                length(unique(Year))*
                                                  length(unique(Code_point_Libelle))
-                                               )))
+)))
 
 newd <- group_by(newd, Day) %>%
   arrange(Day, by_group = TRUE)
 
 # Add the Year vector
-newd$Year <- rep(unique(Season_Meso$Year), 
-                 365*length(unique(Season_Meso$Code_point_Libelle)))
+newd$Year <- rep(unique(Season_Meso_filter$Year), 
+                 365*length(unique(Season_Meso_filter$Code_point_Libelle)))
 
 newd <- group_by(newd, Year, Day) %>%
   arrange(Year, by_group = TRUE)
 
 # And the site vector
-newd$Code_point_Libelle <- rep(unique(Season_Meso$Code_point_Libelle), 
-                               365*length(unique(Season_Meso$Year)))
+newd$Code_point_Libelle <- rep(unique(Season_Meso_filter$Code_point_Libelle), 
+                               365*length(unique(Season_Meso_filter$Year)))
 
 newd <- ungroup(newd) %>%
   group_by(Code_point_Libelle) %>%
@@ -462,19 +542,21 @@ se.fit <- pred$se.fit
 # Set the pseudo-random seed to make results reproducible (?)
 set.seed(42)
 # specify the number of simulations to generate
-N <- 10000
+N <- 5000
 
 # N draws from a multivariate normal distributed matrix with mean 0 (?)
 BUdiff <- rmvn(N, mu = rep(0, nrow(Vb)), sig = Vb)
+
+# Remove
+rm(Vb)
 
 # Calculating a function now (?)
 Cg <- predict(gam_Meso, newd, type = "lpmatrix")
 simDev <- Cg %*% t(BUdiff)
 
-# Remove useless things to free memory space
+# Remove on the way to free memory space
 rm(Cg)
 rm(BUdiff)
-rm(Vb)
 
 ### CAREFUL ! The 'absdev' and 'masd' steps can take a lot of time, especially
 # when N is large. Don't panic, it eventually finishes running after a few tens
@@ -492,7 +574,8 @@ rm(absDev)
 # the simultaneous interval
 crit <- quantile(masd, prob = 0.95, type = 8)
 
-# Now that crit is calculated, remove the big tables that take all the space
+# Now that crit is calculated, remove the big masd table that takes all the 
+# memory space
 rm(masd)
 # It now runs much quicker. Nice.
 
@@ -523,7 +606,7 @@ pred_plot <- pred %>%
     .groups = 'keep')
 
 # Saving pred_plot so we don't have to re-run the model every time
-# write.csv2(pred_plot, 'pred_plot_MESO_20240418.csv', row.names = FALSE,
+# write.csv2(pred_plot, 'pred_plot_MESO_20241121.csv', row.names = FALSE,
 #            fileEncoding = "ISO-8859-1")
 
 # Transform values so they are expressed in the response variable units
@@ -532,7 +615,7 @@ response_pred_plot <- as.data.frame(pred_plot) %>%
   mutate(across(c('median.fit', 'lwrS', 'uprS', 'lwrP', 'uprP'), ~ ilink(.)))
 
 # Let's save the response_pred_plot (might be useful later)
-# write.csv2(response_pred_plot, 'response_pred_plot_MESO_20240424.csv',
+# write.csv2(response_pred_plot, 'response_pred_plot_MESO_20241121.csv',
 #            row.names = FALSE, fileEncoding = 'ISO-8859-1')
 
 # You can check that the backtransformation by the inverse link function
@@ -587,16 +670,20 @@ pheno_palette10 <- c('red3', 'orangered1', 'dodgerblue4', 'dodgerblue1',
 # plot in the desired order
 response_pred_plot <- response_pred_plot %>%
   mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
                                           'Antifer ponton pétrolier', 'Cabourg',
+                                          'Loguivy', 'les Hébihens',
                                           'Men er Roue', 'Ouest Loscolo',
                                           'Le Cornard', 'Auger',
                                           'Arcachon - Bouée 7', 'Teychan bis',
                                           'Bouzigues (a)', 'Diana centre'))
 
 # And do the exact same thing in the Season_Meso dataset
-Season_Meso <- Season_Meso %>%
+Season_Meso_filter <- Season_Meso_filter %>%
   mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
                                           'Antifer ponton pétrolier', 'Cabourg',
+                                          'Loguivy', 'les Hébihens',
                                           'Men er Roue', 'Ouest Loscolo',
                                           'Le Cornard', 'Auger',
                                           'Arcachon - Bouée 7', 'Teychan bis',
@@ -604,15 +691,9 @@ Season_Meso <- Season_Meso %>%
 
 #### Cropping out data points for plotting ####
 # Crop out highest data points of each site to have better view of the model
-Season_Meso_crop <- Season_Meso %>%
+Season_Meso_crop <- Season_Meso_filter %>%
   # Antifer
-  filter(ifelse(true_count > 10 & Code_point_Libelle == 'Antifer ponton pétrolier',
-                # if condition met, drop the line
-                FALSE,
-                # else, keep the line
-                TRUE)) %>%
-  # Cabourg
-  filter(ifelse(true_count > 90 & Code_point_Libelle == 'Cabourg',
+  filter(ifelse(true_count > 25 & Code_point_Libelle == 'Antifer ponton pétrolier',
                 # if condition met, drop the line
                 FALSE,
                 # else, keep the line
@@ -679,6 +760,9 @@ ggplot(response_pred_plot, aes(x = Day, y = median.fit,
   # scale_y_continuous(limits = c(0,40)) +
   geom_point(data = Season_Meso_crop, aes(x = Day, y = true_count), 
              size = .8, alpha = .5) +
+  # Add a "ghost point" to force the minimum y-axis range to 5
+  geom_point(aes(x = 1, y = 5), color = 'transparent', fill = 'transparent',
+             size = .8, alpha = .5) +
   labs(y = "Mesodinium cells observed in 10 mL",
        x = "Day of the year",
        title = "Poisson GAM of Mesodinium phenology" #,
@@ -686,8 +770,8 @@ ggplot(response_pred_plot, aes(x = Day, y = median.fit,
   ) +
   facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
   # Set the color palette :
-  scale_color_discrete(type = pheno_palette10, guide = 'none') +
-  scale_fill_discrete(type = pheno_palette10, guide = 'none') +
+  scale_color_discrete(type = pheno_palette14, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette14, guide = 'none') +
   theme_classic()
 
 # Saving plot
