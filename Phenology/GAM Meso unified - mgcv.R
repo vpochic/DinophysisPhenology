@@ -491,6 +491,8 @@ HistRes_custom
 # We can try to obtain better confidence intervals.
 # This section is almost entirely taken from a post by Gavin Simpson on his
 # blog 'From the bottom of the heap'
+# Reference : 
+# https://fromthebottomoftheheap.net/2016/12/15/simultaneous-interval-revisited/
 
 # We want to define better confidence intervals and plot some examples of
 # model fits taken from the bayesian posterior distribution of the model

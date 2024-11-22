@@ -574,6 +574,8 @@ HistRes_custom
 # We can try to obtain better confidence intervals.
 # This section is almost entirely taken from a post by Gavin Simpson on his
 # blog 'From the bottom of the heap'
+# Reference : 
+# https://fromthebottomoftheheap.net/2016/12/15/simultaneous-interval-revisited/
 
 # We want to define better confidence intervals and plot some examples of
 # model fits taken from the bayesian posterior distribution of the model
@@ -625,7 +627,7 @@ se.fit <- pred$se.fit
 # Set the pseudo-random seed to make results reproducible (?)
 set.seed(42)
 # specify the number of simulations to generate
-N <- 10000
+N <- 5000
 
 # N draws from a multivariate normal distributed matrix with mean 0 (?)
 BUdiff <- rmvn(N, mu = rep(0, nrow(Vb)), sig = Vb)
@@ -690,7 +692,7 @@ pred_plot <- pred %>%
     .groups = 'keep')
 
 # Saving pred_plot so we don't have to re-run the model every time
-# write.csv2(pred_plot, 'pred_plot_20240813_16sites.csv', row.names = FALSE,
+# write.csv2(pred_plot, 'pred_plot_20241120_16sites.csv', row.names = FALSE,
 #            fileEncoding = "ISO-8859-1")
 
 # Transform values so they are expressed in the response variable units
@@ -699,7 +701,7 @@ response_pred_plot <- as.data.frame(pred_plot) %>%
   mutate(across(c('median.fit', 'lwrS', 'uprS', 'lwrP', 'uprP'), ~ ilink(.)))
 
 # And save that shall we
-# write.csv2(response_pred_plot, 'response_pred_plot_20240813_16sites.csv',
+# write.csv2(response_pred_plot, 'response_pred_plot_20241120_16sites.csv',
 #            row.names = FALSE, fileEncoding = 'ISO-8859-1')
 
 # You can check that the backtransformation by the inverse link function
@@ -751,7 +753,7 @@ pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered',
                      '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
 
 # Import 'response_pred_plot' if necessary
-response_pred_plot <- read.csv2('response_pred_plot_20240813_14sites.csv',
+response_pred_plot <- read.csv2('response_pred_plot_20241120_16sites.csv',
                                 header = TRUE, fileEncoding = 'ISO-8859-1')
 
 # And Season_Dino

@@ -1,6 +1,6 @@
 ### GAMs of pigment concentrations ###
 # Part of the Dinophysis Phenology project
-# V. POCHIC 2024-
+# V. POCHIC 2024-11-22
 
 ### Required packages ####
 
@@ -245,7 +245,13 @@ ggplot() +
 
 ### GAM of Alloxanthin ####
 
-gam_Allo <- gam(data = Table_Allo, 
+# Transform Year as a factor for the random effect
+Table_Allo_factor <- Table_Allo %>%
+  mutate(Year = as_factor(Year)) %>%
+  # And evacuate 4 dates for which the alloxanthin concentration is 0 (unlikely)
+  filter(Allo > 0)
+
+gam_Allo <- gam(data = Table_Allo_factor, 
                    # Only a spline for the day of the year
                    # The use of a cyclic basis spline helps to make ends meet at the
                    # first and last days of the year
@@ -257,16 +263,15 @@ gam_Allo <- gam(data = Table_Allo,
                    # We add the Year as a random effect. This will help to assess and
                    # smooth the effects of interannual variability in the phenology
                    + s(Year, bs = 're', k = -1),
-                   # Using a Gaussian distribution
-                   family = gaussian(),
+                   # Using a Gamma distribution (close to a log-normal distribution)
+                   family = Gamma(),
                    # Restricted maximum likelihood estimation (recommended method)
                    method = 'REML')
 
 summary(gam_Allo)
 gam.check(gam_Allo)
 
-# gam.check indicates that there might be an issue with the random effect
-# smooth for 'Year' (low p-value)
+# gam.check indicates things look ok
 
 # Create a new 'empty' dataset for storing model prediction (fit)
 gam_Allo_newdata <- expand_grid(Day=seq(1, 365),
@@ -295,8 +300,8 @@ gam_Allo_newdata <- mutate(gam_Allo_newdata,
                               fit_resp  = ilink(fit_link),
                               right_upr = ilink(fit_link + (2 * se_link)),
                               right_lwr = ilink(fit_link - (2 * se_link)))
-# Check the confidence interval. It should not extend below 0 (negative counts
-# are impossible)
+# Check the confidence interval. It should not extend below 0 (negative pigment
+# concentrations are impossible)
 min(gam_Allo_newdata$right_lwr) # Nice :)
 min(gam_Allo_newdata$fit_resp)
 max(gam_Allo_newdata$right_upr) # Nice too
@@ -352,12 +357,13 @@ qqplot_custom <- ggplot(qq_data) +
   scale_color_discrete(type = pheno_palette4, guide = 'none') +
   theme_classic() +
   facet_wrap(facets = c('Code_point_Libelle')) +
-  labs(y="Sample Quantiles",x="Theoretical Quantiles")
+  labs(title = 'qq-plot for alloxanthin GAM', y="Sample Quantiles",
+       x="Theoretical Quantiles")
 
 qqplot_custom
 
 # Save the plot
-# ggsave('qqplot_custom_16sites.tiff', dpi = 300, height = 175, width = 250,
+# ggsave('qqplot_allox_4sites.tiff', dpi = 300, height = 175, width = 250,
 #                units = 'mm', compression = 'lzw')
 
 # We can do the same for residuals vs fitted
@@ -366,14 +372,15 @@ RvFplot_custom <- ggplot(qq_data)+
                  color = Code_point_Libelle), alpha = .7) +
   scale_color_discrete(type = pheno_palette4, guide = 'none') +
   theme_classic() +
-  facet_wrap(facets = c('Code_point_Libelle')) +
-  labs(y="Residuals",x="Fitted Values")
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free') +
+  labs(title = 'Residuals vs fitted (alloxanthin GAM)',
+       y="Residuals", x="Fitted Values")
 
 RvFplot_custom
-# Some trumpet shaped plots here...
+# Not much structure : quite good
 
 # Save the plot
-# ggsave('RvFplot_custom_16sites.tiff', dpi = 300, height = 175, width = 250,
+# ggsave('RvFplot_allox_4sites.tiff', dpi = 300, height = 175, width = 250,
 #                units = 'mm', compression = 'lzw')
 
 # And let's do one last diagnostic plot with histogram of residuals
@@ -382,39 +389,192 @@ HistRes_custom <- ggplot(qq_data, aes(x = Residuals, fill = Code_point_Libelle))
   scale_fill_discrete(type = pheno_palette4, guide = 'none') +
   theme_classic() +
   facet_wrap(facets = c('Code_point_Libelle')) +
-  labs(x='Residuals', y = 'Count')
+  labs(title = 'Histogram of residuals (alloxanthin GAM)',
+    x='Residuals', y = 'Count')
 
 HistRes_custom
-# x-axis range not adapted
+# Mostly centered on 0 -> nice
 
 # Save the plot
-# ggsave('HistRes_custom_16sites.tiff', dpi = 300, height = 175, width = 250,
+# ggsave('HistRes_allox_4sites.tiff', dpi = 300, height = 175, width = 250,
 #                units = 'mm', compression = 'lzw')
 
-# Plotting the whole model
+### Calculating confidence intervals ####
+
+# We can try to obtain better confidence intervals.
+# This section is almost entirely taken from a post by Gavin Simpson on his
+# blog 'From the bottom of the heap'
+# Reference : 
+# https://fromthebottomoftheheap.net/2016/12/15/simultaneous-interval-revisited/
+
+# We want to define better confidence intervals and plot some examples of
+# model fits taken from the bayesian posterior distribution of the model
+# to illustrate model variability
+
+# First
+# A function for generating random values from a multivariate normal
+rmvn <- function(n, mu, sig) { ## MVN random deviates
+  L <- mroot(sig)
+  m <- ncol(L)
+  t(mu + L %*% matrix(rnorm(m*n), m, n))
+}
+
+
+# We extract a few things from the fitted gam
+
+# Bayesian covariance matrix (unconditional = TRUE means we adjust for the 
+# smoothing parameters being estimated rather than known values)
+Vb <- vcov(gam_Allo)
+# New data
+newd <- with(Table_Allo_factor, data.frame(Day = rep(seq(1, 365, length = 365),
+                                               length(unique(Year))*
+                                                 length(unique(Code_point_Libelle))
+)))
+
+newd <- group_by(newd, Day) %>%
+  arrange(Day, by_group = TRUE)
+
+# Add the Year vector
+newd$Year <- rep(unique(Table_Allo_factor$Year), 
+                 365*length(unique(Table_Allo_factor$Code_point_Libelle)))
+
+newd <- group_by(newd, Year, Day) %>%
+  arrange(Year, by_group = TRUE)
+
+# And the site vector
+newd$Code_point_Libelle <- rep(unique(Table_Allo_factor$Code_point_Libelle), 
+                               365*length(unique(Table_Allo_factor$Year)))
+
+newd <- ungroup(newd) %>%
+  group_by(Code_point_Libelle) %>%
+  arrange(Code_point_Libelle)
+
+# Prediction by the model on the ***response*** scale, on the new data
+pred <- predict(gam_Allo, newd, se.fit = TRUE, type = 'response')
+# Isolate standard error of the predicted fit
+se.fit <- pred$se.fit
+
+# Set the pseudo-random seed to make results reproducible (?)
+set.seed(42)
+# specify the number of simulations to generate
+N <- 5000
+
+# N draws from a multivariate normal distributed matrix with mean 0 (?)
+BUdiff <- rmvn(N, mu = rep(0, nrow(Vb)), sig = Vb)
+
+# Remove
+rm(Vb)
+
+# Calculating a function now (?)
+Cg <- predict(gam_Allo, newd, type = "lpmatrix")
+simDev <- Cg %*% t(BUdiff)
+
+# Remove on the way to free memory space
+rm(Cg)
+rm(BUdiff)
+
+### CAREFUL ! The 'absdev' and 'masd' steps can take a lot of time, especially
+# when N is large. Don't panic, it eventually finishes running after a few tens
+# of minutes.
+
+# Finding the absolute values of the standardized deviation from the true model (?)
+absDev <- abs(sweep(simDev, 1, se.fit, FUN = "/"))
+rm(simDev)
+
+# Computing the maximum of the absolute standard deviation
+masd <- apply(absDev, 2L, max)
+rm(absDev)
+
+# Finding the critical value used to scale the standard errors to yield 
+# the simultaneous interval
+crit <- quantile(masd, prob = 0.95, type = 8)
+
+# Now that crit is calculated, remove the big masd table that takes all the 
+# memory space
+rm(masd)
+
+# It now runs much quicker. Nice.
+
+# Adjusting the variables in the prediction to take
+pred <- transform(cbind(data.frame(pred), newd),
+                  uprP = fit + (2 * se.fit),
+                  lwrP = fit - (2 * se.fit),
+                  # The simultaneous CI is based on the critical value
+                  # calculated just above
+                  uprS = fit + (crit * se.fit),
+                  lwrS = fit - (crit * se.fit))
+# The simultaneous interval goes crazy here, with negative values. We'll have to
+# stick with the point-wise interval
+
+
+# Constructing a CI based on maximum and minimum simultaneous interval for
+# plotting
+# This is the response already because it was predicted on the response scale
+response_pred_plot <- pred %>%
+  group_by(Day, Code_point_Libelle) %>%
+  summarise(
+    # median
+    median.fit = median(fit),
+    # Confidence intervals
+    # Here we take minimum and maximum to encompass all possible years (17), as
+    # the prediction varies among years
+    # Simultaneous confidence interval (CI)
+    lwrS = min(lwrS), uprS = max(uprS),
+    # Point-wise CI
+    lwrP = min(lwrP), uprP = max(uprP), 
+    .groups = 'keep')
+
+# Saving response_pred_plot so we don't have to re-run the model every time
+# write.csv2(response_pred_plot, 'response_pred_plot_Allox_20241122_4sites.csv', row.names = FALSE,
+#            fileEncoding = "ISO-8859-1")
+
+# Transform values so they are expressed in the response variable units
+# (by applying the inverse link function)
+response_pred_plot <- as.data.frame(pred_plot) %>%
+  mutate(across(c('median.fit', 'lwrS', 'uprS', 'lwrP', 'uprP'), ~ ilink(.)))
+
+# And save that shall we
+# write.csv2(response_pred_plot, 'response_pred_plot_Allox_20241122_4sites.csv',
+#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
+
+# You can check that the backtransformation by the inverse link function
+# worked by comparing the pred_plot and response_pred_plot tables.
+# The response_pred_plot values should be higher.
+
+# Checking the confidence intervals
+# minimum and maximum values
+min(response_pred_plot$median.fit)
+min(response_pred_plot$lwrS) # Not < 0, nice :)
+min(response_pred_plot$lwrP) # Not < 0, nice :)
+max(response_pred_plot$median.fit)
+max(response_pred_plot$uprS)
+max(response_pred_plot$uprP)
+# We can see that the simultaneous interval goes bonkers here
+
+### Plotting the whole model ####
 
 ggplot() +
   # plot the GAM
-  geom_ribbon(data = gam_Allo_newdata, aes(x = Day, ymin = right_lwr, 
-                                              ymax = right_upr,
+  geom_ribbon(data = response_pred_plot, aes(x = Day, ymin = lwrP, 
+                                              ymax = uprP,
                                               color = Code_point_Libelle, 
                                               fill = Code_point_Libelle),
               linewidth = .75, alpha = .2) +
-  geom_line(data = gam_Allo_newdata, aes(x = Day, y = fit_resp,
+  geom_line(data = response_pred_plot, aes(x = Day, y = median.fit,
                                             color = Code_point_Libelle),
             linewidth = 1) +
   # plot the data
-  geom_point(data = Table_Allo, aes(x = Day, y = Allo,
+  geom_point(data = Table_Allo_factor, aes(x = Day, y = Allo,
                                        color = Code_point_Libelle, 
                                        fill = Code_point_Libelle), size = 2,
              alpha = .3) +
   scale_color_discrete(type = pheno_palette4, guide = 'none') +
   scale_fill_discrete(type = pheno_palette4, guide = 'none') +
-  facet_wrap(facets = c('Code_point_Libelle')) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
   # cut the y scale at 22
   #scale_y_continuous(limits = c(0,22)) +
   # Text
-  labs(title = 'Alloxanthin concentration', x = 'Calendar day', 
+  labs(title = 'GAM of alloxanthin concentration', x = 'Calendar day', 
        y = 'Pigment concentration (microgram/L)') +
   theme_classic()
 
@@ -603,7 +763,7 @@ ggplot() +
 ## Import data ####
 # GAM data ####
 ## Dinophysis GAM data
-gam_Dino <- read.csv2('response_pred_plot_20240813_14sites.csv',
+gam_Dino <- read.csv2('response_pred_plot_20241120_16sites.csv',
                                 header = TRUE, fileEncoding = 'ISO-8859-1')
 # Separate sites
 gam_Dino_Antifer <- filter(gam_Dino, 
@@ -613,7 +773,7 @@ gam_Dino_MeR <- filter(gam_Dino, Code_point_Libelle == 'Men er Roue')
 gam_Dino_OL <- filter(gam_Dino, Code_point_Libelle == 'Ouest Loscolo')
 
 ## Mesodinium GAM data
-gam_Meso <- read.csv2('pred_plot_MESO_20240418.csv', header = TRUE,
+gam_Meso <- read.csv2('response_pred_plot_MESO_20241121.csv', header = TRUE,
                        fileEncoding = 'ISO-8859-1')
 
 # Separate sites
@@ -623,9 +783,21 @@ gam_Meso_Cabourg <- filter(gam_Meso, Code_point_Libelle == 'Cabourg')
 gam_Meso_MeR <- filter(gam_Meso, Code_point_Libelle == 'Men er Roue')
 gam_Meso_OL <- filter(gam_Meso, Code_point_Libelle == 'Ouest Loscolo')
 
+# Alloxanthin data as well!
+# Import data
+gam_Allo_plot <- read.csv2('response_pred_plot_Allox_20241122_4sites.csv',
+                           header = TRUE, fileEncoding = 'ISO-8859-1')
+
+gam_Allo_Antifer <- filter(gam_Allo_plot, 
+                           Code_point_Libelle == 'Antifer ponton pétrolier')
+gam_Allo_Cabourg <- filter(gam_Allo_plot, Code_point_Libelle == 'Cabourg')
+gam_Allo_MeR <- filter(gam_Allo_plot, Code_point_Libelle == 'Men er Roue')
+gam_Allo_OL <- filter(gam_Allo_plot, Code_point_Libelle == 'Ouest Loscolo')
+
 # Count data ####
 # The sites must be entered as factors
-Season_Dino <- Season_Dino %>%
+Season_Dino <- read.csv2('Season_Dino.csv', header = TRUE, 
+                         fileEncoding = 'ISO-8859-1') %>%
   mutate(Code_point_Libelle = as.factor(Code_point_Libelle))
 
 # Separate sites
@@ -639,42 +811,8 @@ Season_Dino_OL <- filter(Season_Dino, Code_point_Libelle == 'Ouest Loscolo')
 
 ### Mesodinium
 # The table of Mesodinium counts
-Table_Meso_zeros <- read.csv2('Table_Meso_zeros.csv', header = TRUE, 
-                              fileEncoding = 'ISO-8859-1',
-                              # ensures that special characters (like +) are not
-                              # changed during import
-                              check.names = FALSE)
-
-# Seasonality
-Season_Meso <- Table_Meso_zeros %>%
-  # Only FLORTOT
-  filter(Code.parametre == 'FLORTOT') %>%
-  # create a calendar day variable
-  mutate(Day = as.numeric(yday(Date))) %>%
-  mutate(Date = ymd(Date)) %>%
-  #### Note that for the 2 sites in Arcachon, counts are sometimes done in
-  # 100 mL, so we need to filter out those counts
-  # For this, we go and look for any count values IN ANY DINOPHYSIS TAXON that
-  # cannot correspond to 10 mL counts (i.e., not multiples of 100)
-  ### We replace these values with 0. Note that for a given date, we can have
-  # one Dinophysis species counted in 10 mL and another in 100 mL
-  ## That's why we have to proceed taxon by taxon
-  mutate(across(.cols = c('Mesodinium', 'Mesodinium rubrum'), .fns = ~ ifelse(. %% 100 != 0, 0, .))) %>%
-  # And creating some count variables for Dinophysis as a genus
-  mutate(Mesodinium_genus = rowSums(across(contains('Mesodinium')))) %>%
-  # create the log of abundance + 1
-  mutate(log_c = log10(Mesodinium_genus+1)) %>%
-  # create a 'true count' variable
-  # this variable corresponds to the number of cells that were actually
-  # counted by the operator (in 10 mL). This variable will follow a Poisson
-  # distribution, contrary to Dinophysis_genus because the conversion from
-  # 10 mL to 1L (*100) prevents some intermediate values (e.g., 150 cells.L-1)
-  mutate(true_count = Mesodinium_genus/100) %>%
-  # Filter out exceptionnaly high counts (>500 cells observed in 10 mL)
-  # this represents 3 events (2 in Antifer and 1 in Cabourg)
-  filter(true_count < 500) %>%
-  # converting the site to factor for the model
-  mutate(Code_point_Libelle = as.factor(Code_point_Libelle))
+Season_Meso <- read.csv2('Season_Meso.csv', header = TRUE, 
+                              fileEncoding = 'ISO-8859-1')
 
 # Separate sites
 Season_Meso_Antifer <- filter(Season_Meso, 
@@ -683,27 +821,316 @@ Season_Meso_Cabourg <- filter(Season_Meso, Code_point_Libelle == 'Cabourg')
 Season_Meso_MeR <- filter(Season_Meso, Code_point_Libelle == 'Men er Roue')
 Season_Meso_OL <- filter(Season_Meso, Code_point_Libelle == 'Ouest Loscolo')
 
+# For Alloxanthin data also (not count data but eh)
+Season_Allo_Antifer <- filter(Table_Allo_factor, 
+                              Code_point_Libelle == 'Antifer ponton pétrolier')
+Season_Allo_Cabourg <- filter(Table_Allo_factor, Code_point_Libelle == 'Cabourg')
+Season_Allo_MeR <- filter(Table_Allo_factor, Code_point_Libelle == 'Men er Roue')
+Season_Allo_OL <- filter(Table_Allo_factor, Code_point_Libelle == 'Ouest Loscolo')
 
 
 ### Plots ####
+
+pheno_palette4 <- c('red3', 'orangered', 
+                    '#2156A1', '#5995E3')
 ## Antifer ####
 
+# Alloxanthin
 plot_Allo_Antifer <- ggplot() +
   # plot the GAM
-  geom_ribbon(data = gam_Allo_newdata, aes(x = Day, ymin = right_lwr, 
-                                              ymax = right_upr),
+  geom_ribbon(data = gam_Allo_Antifer, aes(x = Day, ymin = lwrP, 
+                                              ymax = uprP),
               linewidth = .75, alpha = .2,
               color = 'red3', fill = 'red3') +
-  geom_line(data = gam_Allo_newdata, aes(x = Day, y = fit_resp),
+  geom_line(data = gam_Allo_Antifer, aes(x = Day, y = median.fit),
             linewidth = 1, color = 'red3') +
   # plot the data
-  geom_point(data = Table_Allo, aes(x = Day, y = Allo), size = 2,
+  geom_point(data = Season_Allo_Antifer, aes(x = Day, y = Allo), size = 2,
              alpha = .3, color = 'red3') +
   # cut the y scale at 22
   #scale_y_continuous(limits = c(0,22)) +
   # Text
-  labs(title = 'Alloxanthin concentration - Antifer', x = 'Calendar day', 
+  labs(title = 'Antifer ponton pétrolier',
+       subtitle = 'Alloxanthin', x = 'Calendar day', 
        y = 'Pigment concentration (microgram/L)') +
   theme_classic()
 
 plot_Allo_Antifer
+
+# Mesodinium
+plot_Meso_Antifer <- ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_Meso_Antifer, aes(x = Day, ymin = lwrP, 
+                                           ymax = uprP),
+              linewidth = .75, alpha = .2,
+              color = 'red3', fill = 'red3') +
+  geom_line(data = gam_Meso_Antifer, aes(x = Day, y = median.fit),
+            linewidth = 1, color = 'red3') +
+  # plot the data
+  geom_point(data = Season_Meso_Antifer, aes(x = Day, y = true_count), size = 2,
+             alpha = .3, color = 'red3') +
+  # cut the y scale at 22
+  #scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(subtitle = 'Mesodinium', x = 'Calendar day', 
+       y = 'Mesodinium cells observed in 10 mL') +
+  theme_classic()
+
+plot_Meso_Antifer
+
+# Dinophysis
+plot_Dino_Antifer <- ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_Antifer, aes(x = Day, ymin = lwrP, 
+                                           ymax = uprP),
+              linewidth = .75, alpha = .2,
+              color = 'red3', fill = 'red3') +
+  geom_line(data = gam_Dino_Antifer, aes(x = Day, y = median.fit),
+            linewidth = 1, color = 'red3') +
+  # plot the data
+  geom_point(data = Season_Dino_Antifer, aes(x = Day, y = true_count), size = 2,
+             alpha = .3, color = 'red3') +
+  # cut the y scale at 22
+  #scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(subtitle = 'Dinophysis', x = 'Calendar day', 
+       y = 'Dinophysis cells observed in 10 mL') +
+  theme_classic()
+
+plot_Dino_Antifer
+
+# Arrange the plot
+ggarrange(plot_Allo_Antifer, plot_Meso_Antifer, plot_Dino_Antifer, nrow = 3,
+          align = 'v')
+
+# Save the plot
+# ggsave('Succession_plot_Antifer.tiff', height = 270, width = 140,
+#                dpi = 300, unit = 'mm', compression = 'lzw')
+
+## Cabourg ####
+
+# Alloxanthin
+plot_Allo_Cabourg <- ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_Allo_Cabourg, aes(x = Day, ymin = lwrP, 
+                                           ymax = uprP),
+              linewidth = .75, alpha = .2,
+              color = 'orangered', fill = 'orangered') +
+  geom_line(data = gam_Allo_Cabourg, aes(x = Day, y = median.fit),
+            linewidth = 1, color = 'orangered') +
+  # plot the data
+  geom_point(data = Season_Allo_Cabourg, aes(x = Day, y = Allo), size = 2,
+             alpha = .3, color = 'orangered') +
+  # cut the y scale at 22
+  #scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(title = 'Cabourg',
+       subtitle = 'Alloxanthin', x = 'Calendar day', 
+       y = 'Pigment concentration (microgram/L)') +
+  theme_classic()
+
+plot_Allo_Cabourg
+
+# Mesodinium
+# We crop out some points for visualisation
+Season_Meso_Cabourg_crop <- Season_Meso_Cabourg %>%
+  filter(true_count < 100)
+
+plot_Meso_Cabourg <- ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_Meso_Cabourg, aes(x = Day, ymin = lwrP, 
+                                           ymax = uprP),
+              linewidth = .75, alpha = .2,
+              color = 'orangered', fill = 'orangered') +
+  geom_line(data = gam_Meso_Cabourg, aes(x = Day, y = median.fit),
+            linewidth = 1, color = 'orangered') +
+  # plot the data
+  geom_point(data = Season_Meso_Cabourg_crop, aes(x = Day, y = true_count), size = 2,
+             alpha = .3, color = 'orangered') +
+  # cut the y scale at 22
+  #scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(subtitle = 'Mesodinium', x = 'Calendar day', 
+       y = 'Mesodinium cells observed in 10 mL') +
+  theme_classic()
+
+plot_Meso_Cabourg
+
+# Dinophysis
+# We crop out some points for visualisation
+Season_Dino_Cabourg_crop <- Season_Dino_Cabourg %>%
+  filter(true_count < 50)
+
+plot_Dino_Cabourg <- ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_Cabourg, aes(x = Day, ymin = lwrP, 
+                                           ymax = uprP),
+              linewidth = .75, alpha = .2,
+              color = 'orangered', fill = 'orangered') +
+  geom_line(data = gam_Dino_Cabourg, aes(x = Day, y = median.fit),
+            linewidth = 1, color = 'orangered') +
+  # plot the data
+  geom_point(data = Season_Dino_Cabourg_crop, aes(x = Day, y = true_count), size = 2,
+             alpha = .3, color = 'orangered') +
+  # cut the y scale at 22
+  #scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(subtitle = 'Dinophysis', x = 'Calendar day', 
+       y = 'Dinophysis cells observed in 10 mL') +
+  theme_classic()
+
+plot_Dino_Cabourg
+
+# Arrange the plot
+ggarrange(plot_Allo_Cabourg, plot_Meso_Cabourg, plot_Dino_Cabourg, nrow = 3,
+          align = 'v')
+
+# Save the plot
+# ggsave('Succession_plot_Cabourg.tiff', height = 270, width = 140,
+#                dpi = 300, unit = 'mm', compression = 'lzw')
+## Men er Roue ####
+
+# Alloxanthin
+plot_Allo_MeR <- ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_Allo_MeR, aes(x = Day, ymin = lwrP, 
+                                           ymax = uprP),
+              linewidth = .75, alpha = .2,
+              color = '#2156A1', fill = '#2156A1') +
+  geom_line(data = gam_Allo_MeR, aes(x = Day, y = median.fit),
+            linewidth = 1, color = '#2156A1') +
+  # plot the data
+  geom_point(data = Season_Allo_MeR, aes(x = Day, y = Allo), size = 2,
+             alpha = .3, color = '#2156A1') +
+  # cut the y scale at 22
+  #scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(title = 'Men er Roue',
+       subtitle = 'Alloxanthin', x = 'Calendar day', 
+       y = 'Pigment concentration (microgram/L)') +
+  theme_classic()
+
+plot_Allo_MeR
+
+# Mesodinium
+plot_Meso_MeR <- ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_Meso_MeR, aes(x = Day, ymin = lwrP, 
+                                           ymax = uprP),
+              linewidth = .75, alpha = .2,
+              color = '#2156A1', fill = '#2156A1') +
+  geom_line(data = gam_Meso_MeR, aes(x = Day, y = median.fit),
+            linewidth = 1, color = '#2156A1') +
+  # plot the data
+  geom_point(data = Season_Meso_MeR, aes(x = Day, y = true_count), size = 2,
+             alpha = .3, color = '#2156A1') +
+  # cut the y scale at 22
+  #scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(subtitle = 'Mesodinium', x = 'Calendar day', 
+       y = 'Mesodinium cells observed in 10 mL') +
+  theme_classic()
+
+plot_Meso_MeR
+
+# Dinophysis
+plot_Dino_MeR <- ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_MeR, aes(x = Day, ymin = lwrP, 
+                                           ymax = uprP),
+              linewidth = .75, alpha = .2,
+              color = '#2156A1', fill = '#2156A1') +
+  geom_line(data = gam_Dino_MeR, aes(x = Day, y = median.fit),
+            linewidth = 1, color = '#2156A1') +
+  # plot the data
+  geom_point(data = Season_Dino_MeR, aes(x = Day, y = true_count), size = 2,
+             alpha = .3, color = '#2156A1') +
+  # cut the y scale at 22
+  #scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(subtitle = 'Dinophysis', x = 'Calendar day', 
+       y = 'Dinophysis cells observed in 10 mL') +
+  theme_classic()
+
+plot_Dino_MeR
+
+# Arrange the plot
+ggarrange(plot_Allo_MeR, plot_Meso_MeR, plot_Dino_MeR, nrow = 3,
+          align = 'v')
+
+# Save the plot
+# ggsave('Succession_plot_MeR.tiff', height = 270, width = 140,
+#                dpi = 300, unit = 'mm', compression = 'lzw')
+## Ouest Loscolo ####
+
+# Alloxanthin
+plot_Allo_OL <- ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_Allo_OL, aes(x = Day, ymin = lwrP, 
+                                       ymax = uprP),
+              linewidth = .75, alpha = .2,
+              color = '#5995E3', fill = '#5995E3') +
+  geom_line(data = gam_Allo_OL, aes(x = Day, y = median.fit),
+            linewidth = 1, color = '#5995E3') +
+  # plot the data
+  geom_point(data = Season_Allo_OL, aes(x = Day, y = Allo), size = 2,
+             alpha = .3, color = '#5995E3') +
+  # cut the y scale at 22
+  #scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(title = 'Ouest Loscolo',
+       subtitle = 'Alloxanthin', x = 'Calendar day', 
+       y = 'Pigment concentration (microgram/L)') +
+  theme_classic()
+
+plot_Allo_OL
+
+# Mesodinium
+plot_Meso_OL <- ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_Meso_OL, aes(x = Day, ymin = lwrP, 
+                                       ymax = uprP),
+              linewidth = .75, alpha = .2,
+              color = '#5995E3', fill = '#5995E3') +
+  geom_line(data = gam_Meso_OL, aes(x = Day, y = median.fit),
+            linewidth = 1, color = '#5995E3') +
+  # plot the data
+  geom_point(data = Season_Meso_OL, aes(x = Day, y = true_count), size = 2,
+             alpha = .3, color = '#5995E3') +
+  # cut the y scale at 22
+  #scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(subtitle = 'Mesodinium', x = 'Calendar day', 
+       y = 'Mesodinium cells observed in 10 mL') +
+  theme_classic()
+
+plot_Meso_OL
+
+# Dinophysis
+plot_Dino_OL <- ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_OL, aes(x = Day, ymin = lwrP, 
+                                       ymax = uprP),
+              linewidth = .75, alpha = .2,
+              color = '#5995E3', fill = '#5995E3') +
+  geom_line(data = gam_Dino_OL, aes(x = Day, y = median.fit),
+            linewidth = 1, color = '#5995E3') +
+  # plot the data
+  geom_point(data = Season_Dino_OL, aes(x = Day, y = true_count), size = 2,
+             alpha = .3, color = '#5995E3') +
+  # cut the y scale at 22
+  #scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(subtitle = 'Dinophysis', x = 'Calendar day', 
+       y = 'Dinophysis cells observed in 10 mL') +
+  theme_classic()
+
+plot_Dino_OL
+
+# Arrange the plot
+ggarrange(plot_Allo_OL, plot_Meso_OL, plot_Dino_OL, nrow = 3,
+          align = 'v')
+
+# Save the plot
+# ggsave('Succession_plot_OL.tiff', height = 270, width = 140,
+#                dpi = 300, unit = 'mm', compression = 'lzw')
