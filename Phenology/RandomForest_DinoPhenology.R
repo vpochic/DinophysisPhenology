@@ -218,10 +218,10 @@ RF_train_folds
 # This seems ok
 
 # We tell the recipe of the model (predict '.derivative' based on everything else,
-# and we convert our categorical variable ('Code_point_Libelle') into a dummy 
+# and we DON'T convert our categorical variable ('Code_point_Libelle') into a dummy 
 # variable
-RF_recipe <- recipe(.derivative ~ ., data = RF_train) %>%
-  step_dummy(Code_point_Libelle)
+RF_recipe <- recipe(.derivative ~ ., data = RF_train) # %>%
+# step_dummy(Code_point_Libelle)
 
 # We create a 'juiced' dataset with the recipe applied to it, for later on
 RF_juiced <- prep(RF_recipe) %>%
@@ -333,10 +333,10 @@ for (i in 1:20) {
   # This seems ok
   
   # We tell the recipe of the model (predict '.derivative' based on everything else,
-  # and we convert our categorical variable ('Code_point_Libelle') into a dummy 
+  # and we DON'T convert our categorical variable ('Code_point_Libelle') into a dummy 
   # variable
-  RF_recipe <- recipe(.derivative ~ ., data = RF_train) %>%
-    step_dummy(Code_point_Libelle)
+  RF_recipe <- recipe(.derivative ~ ., data = RF_train) # %>%
+  #   step_dummy(Code_point_Libelle)
   
   # We create a 'juiced' dataset with the recipe applied to it, for later on
   RF_juiced <- prep(RF_recipe) %>%
@@ -398,13 +398,14 @@ for (i in 1:20) {
 }
 
 # Save the result!
-# write.csv2(dataplot_vip, 'Randomforest_vip_data_20241010.csv', row.names = FALSE)
+write.csv2(dataplot_vip, 'Randomforest_vip_data_20241203.csv', 
+           row.names = FALSE, fileEncoding = 'ISO-8859-1')
 
 ## Variable importance plot ####
 
 # If necessary, import data previosuly saved
-dataplot_vip <- read.csv2('Randomforest_vip_data_20241010.csv', header = TRUE,
-                          fileEncoding = 'ISO-8859-1')
+# dataplot_vip_import <- read.csv2('Randomforest_vip_data_20241203.csv', header = TRUE,
+#                           fileEncoding = 'ISO-8859-1')
 
 # We pivot longer the values of variable importance to get tidy data
 
@@ -422,38 +423,33 @@ dataplot_vip_median <- dataplot_vip_tidy %>%
 dataplot_vip_tidy <- dataplot_vip_tidy %>%
   mutate(Variable = as_factor(Variable)) %>%
   # relevel the factor in descending order of variable importance
-  mutate(Variable = fct_relevel(Variable, 'TEMP', 'CHLOROA', 'SALI', 
-                                "X14.Day_Average_SI", 
-                                "Code_point_Libelle_Ouest.Loscolo",
-                                "Stratification_Index",
-                                "Code_point_Libelle_Arcachon...Bouée.7",
-                                "Code_point_Libelle_Cabourg",
-                                "Code_point_Libelle_Auger",
-                                "Code_point_Libelle_Men.er.Roue",
-                                "Code_point_Libelle_Le.Cornard",
-                                "Code_point_Libelle_Teychan.bis",
-                                "Code_point_Libelle_At.so",
-                                "Code_point_Libelle_les.Hébihens",
-                                "Code_point_Libelle_Point.1.Boulogne",
-                                "Code_point_Libelle_Loguivy"))
+  mutate(Variable = fct_relevel(Variable, 'SALI', 'X14.Day_Average_SI', 
+                                'Code_point_Libelle', 'TEMP',
+                                'Stratification_Index', 'CHLOROA'))
+
+# Color palette
+palette_bretagne6 <- c('#435E7B', '#11203E', '#09050B', '#791D40',
+                       '#757AC9', '#649003')
 
 # Plot
-ggplot(data = dataplot_vip_tidy, aes(x = Variable, y = value)) +
+ggplot(data = dataplot_vip_tidy, aes(x = Variable, y = value, color = Variable)) +
   # A dot plot
   geom_point(position = position_jitter(width = .1),
-             color = 'dodgerblue3', alpha = .4) +
+             alpha = .4) +
   # With a boxplot as overlay
-  geom_boxplot(fill = 'transparent', color = 'dodgerblue4', outliers = FALSE) +
+  geom_boxplot(fill = 'transparent', outliers = FALSE) +
   # Custom label for y axis
   labs(x = NULL, y = 'Variable importance') +
   # Flip x and y axes
   coord_flip() +
   # Reverse x axis so most important variable appears at the top
   scale_x_discrete(limits = rev) +
+  # Color palette
+  scale_color_discrete(type = palette_bretagne6, guide = 'none') +
   theme_classic()
 
 # Save the plot
-# ggsave('VIP_RandomForest_20241010.tiff', width = 225, height = 170, units = 'mm',
+# ggsave('VIP_RandomForest_20241203.tiff', width = 225, height = 170, units = 'mm',
 #        compression = 'lzw', dpi = 300)
 
 # According to Dr. Bede Davies, it's better to represent it as mean +-std error
