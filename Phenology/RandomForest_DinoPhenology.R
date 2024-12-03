@@ -1,6 +1,6 @@
 ###### Random forest model for Dinophysis phenology ###
 ## V. POCHIC
-# 2024-10-03
+# 2024-12-03
 
 # The goal here is to apply a random forest model to our data on Dinophysis
 # accumulation/loss rates, in order to identify the variables that are best
@@ -22,6 +22,7 @@ library(tidymodels)
 library(tidyverse)
 library(vip)
 library(ranger)
+library(DescTools)
 
 ### Import data ####
 ## Part 1: Dinophysis sampling data ####
@@ -62,6 +63,11 @@ Season_Dino_12sites <- filter(Season_Dino, Code_point_Libelle %in%
 gam_Dino.d <- read.csv2('Derivatives_GAM_Dino_12sites_20241003.csv', 
                         header = TRUE, fileEncoding = 'ISO-8859-1')
 
+# Or with the multiyear data
+gam_Dino.d_multiyear <- read.csv2('gam_Dino_multiyear_deriv_20241203.csv', 
+                                  header = TRUE, fileEncoding = 'ISO-8859-1') %>%
+  # Put Date in date format
+  mutate(Date = ymd(Date))
 
 ## Part 3: environmental data ####
 ### Hydrological parameters form the REPHY dataset
@@ -139,17 +145,24 @@ Table_data_RF <- left_join(Table_data_RF, Table_hydro_select,
 # And now the tricky part: we project the derivative on every date based on the
 # calendar day.
 ## Note: it would be even better to integrate the random effect of the year in
-# the future
+# the future (done)
 
-# First, we remove duplicates in the GAM derivatives dataset 
-# (because Year isn't included)
+# First, we remove duplicates in the GAM derivatives dataset (not the one with 
+# every year) because Year isn't included
 gam_Dino.d_distinct <- distinct(gam_Dino.d)
 
-Table_data_RF <- left_join(Table_data_RF, gam_Dino.d_distinct, 
+Table_data_RF_uniyear <- left_join(Table_data_RF, gam_Dino.d_distinct, 
                            by = c('Code_point_Libelle', 'Day'), suffix = c('',''))
 
+# For the one with 
+Table_data_RF_multiyear <- left_join(Table_data_RF, gam_Dino.d_multiyear, 
+                                     by = c('Code_point_Libelle', 'Date'), 
+                                     suffix = c('','')) %>%
+  # change the name of the derivative for consistency
+  mutate(.derivative = deriv)
+
 # Let's see how much data we have in each site
-ggplot(Table_data_RF) +
+ggplot(Table_data_RF_multiyear) +
   geom_histogram(aes(x = Code_point_Libelle, fill = Code_point_Libelle),
                  stat = 'count') +
   theme_classic()
@@ -164,8 +177,14 @@ ggplot(Table_data_RF) +
 # response variable (.derivative) and the predictor variables (TEMP, SALI,
 # CHLOROA, X.14.Day_Average_SI, Stratification_Index). Let's also try to keep
 # Code_point_Libelle to see if unmonitored local factors play a big role
-RF_data <- Table_data_RF %>%
+RF_data <- Table_data_RF_uniyear %>%
 select(.derivative, TEMP, SALI, CHLOROA, X14.Day_Average_SI, 
+         Stratification_Index, Code_point_Libelle) %>%
+  # We drop any NA value in these variables
+  drop_na()
+
+RF_data <- Table_data_RF_multiyear %>%
+  select(.derivative, TEMP, SALI, CHLOROA, X14.Day_Average_SI, 
          Stratification_Index, Code_point_Libelle) %>%
   # We drop any NA value in these variables
   drop_na()
@@ -383,6 +402,10 @@ for (i in 1:20) {
 
 ## Variable importance plot ####
 
+# If necessary, import data previosuly saved
+dataplot_vip <- read.csv2('Randomforest_vip_data_20241010.csv', header = TRUE,
+                          fileEncoding = 'ISO-8859-1')
+
 # We pivot longer the values of variable importance to get tidy data
 
 dataplot_vip_tidy <- pivot_longer(dataplot_vip, cols = -c('Variable'), 
@@ -430,5 +453,41 @@ ggplot(data = dataplot_vip_tidy, aes(x = Variable, y = value)) +
   theme_classic()
 
 # Save the plot
-ggsave('VIP_RandomForest_20241010.tiff', width = 225, height = 170, units = 'mm',
-       compression = 'lzw', dpi = 300)
+# ggsave('VIP_RandomForest_20241010.tiff', width = 225, height = 170, units = 'mm',
+#        compression = 'lzw', dpi = 300)
+
+# According to Dr. Bede Davies, it's better to represent it as mean +-std error
+# So we'll do just that and calculate the mean for each
+dataplot_vip_mean <- dataplot_vip_tidy %>%
+  summarise(value.mean = mean(value), .groups = 'keep') %>%
+  arrange(desc(value.mean))
+
+# Same order as the median, that's convenient.
+# Calculate the standard error
+dataplot_vip_se <- dataplot_vip_tidy %>%
+  summarise(value.se = MeanSE(value), .groups = 'keep')
+
+# Group the 2 dataframes
+dataplot_vip_stats <- left_join(dataplot_vip_mean, dataplot_vip_se, 
+                                by = c('Variable'))
+
+# Plot with mean +- se
+ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean)) +
+  # points for means
+  geom_point(size = 5, fill = '#BBD4F2', color = '#435E7B',
+             shape = 21, stroke = .8) +
+  # error bars
+  geom_errorbar(aes(x = Variable, ymin = value.mean - value.se,
+                    ymax = value.mean + value.se), linewidth = .8,
+                color = 'grey10', width = .4) +
+  # Custom label for y axis
+  labs(x = NULL, y = 'Variable importance') +
+  # Flip x and y axes
+  coord_flip() +
+  # Reverse x axis so most important variable appears at the top
+  scale_x_discrete(limits = rev) +
+  theme_classic()
+
+# Save the plot
+# ggsave('VIP_RandomForest_meanse_20241014.tiff', width = 225, height = 170, units = 'mm',
+#        compression = 'lzw', dpi = 300)

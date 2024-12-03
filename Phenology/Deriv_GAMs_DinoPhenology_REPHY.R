@@ -1,6 +1,6 @@
 #### Derivatives of fitted GAMs for Dinophysis phenology ##
 ### V. POCHIC
-# 2024-10-04
+# 2024-12-03
 
 # /!\ This script requires data tables generated with the 'GAM Dino unified more sites' 
 # and 'GAM Meso unified' AND Dino_phenology_heatmaps scripts /!\
@@ -15,6 +15,7 @@ library(gratia)
 library(ggnewscale)
 library(cmocean)
 library(RColorBrewer)
+library(gcplyr)
 
 ### deriv function
 source('derivFun.R')
@@ -24,9 +25,13 @@ source('derivFun.R')
 
 Season_Dino <- read.csv2('Season_Dino.csv', header = TRUE, 
                          fileEncoding = 'ISO-8859-1')
+Season_Meso <- read.csv2('Season_Meso.csv', header = TRUE, 
+                         fileEncoding = 'ISO-8859-1')
 
 # The sites must be entered as factors
 Season_Dino <- Season_Dino %>%
+  mutate(Code_point_Libelle = as.factor(Code_point_Libelle))
+Season_Meso <- Season_Meso %>%
   mutate(Code_point_Libelle = as.factor(Code_point_Libelle))
 
 # Alright!
@@ -74,8 +79,14 @@ Season_Meso <- Table_Meso_zeros %>%
 
 #### Fitting GAMs ####
 
-### Dinophysis
-gam_Dino <- gam(data = Season_Dino, 
+# Dinophysis ####
+
+# We will use the Year as a random effect and for this we need it as a factor
+Season_Dino_factor <- Season_Dino %>%
+  mutate(Year = as_factor(Year))
+
+
+gam_Dino <- gam(data = Season_Dino_factor, 
                 # Only a spline for the day of the year
                 # The use of a cyclic basis spline helps to make ends meet at the
                 # first and last days of the year
@@ -94,8 +105,68 @@ gam_Dino <- gam(data = Season_Dino,
                 # Restricted maximum likelihood estimation (recommended method)
                 method = 'REML')
 
-# We can have a look at the diagnostic plots to be sure it worked as intended
-# Model outputs
+summary(gam_Dino)
+gam.check(gam_Dino)
+
+# gam.check indicates that there might be an issue with the random effect
+# smooth for 'Year' (low p-value)
+
+# Create a new 'empty' dataset for storing model prediction (fit)
+gam_Dino_newdata <- expand_grid(Day=seq(1, 365),
+                                # We add a Year vector as it has become a factor
+                                # of the model
+                                Year=seq(min(Season_Dino$Year), 
+                                         max(Season_Dino$Year)),
+                                # We also add the site data
+                                Code_point_Libelle = unique(Season_Dino$Code_point_Libelle))
+
+## Get the inverse link function of the model
+# With this function, we can transform the prediction we make on the link
+#scale to the response scale
+ilink <- gam_Dino$family$linkinv
+
+## Predict : add fit and se.fit on the **link** scale
+gam_Dino_newdata <- bind_cols(gam_Dino_newdata, 
+                              setNames(as_tibble(
+                                predict(gam_Dino, gam_Dino_newdata, 
+                                        se.fit = TRUE, type = 'link',
+                                        re.form = ~ 1|Year)[1:2]),
+                                c('fit_link','se_link')))
+
+## Create the 95% confidence interval (2*standard error fit) and backtransform 
+# to response variable using the inverse link function
+gam_Dino_newdata <- mutate(gam_Dino_newdata,
+                           fit_resp  = ilink(fit_link),
+                           right_upr = ilink(fit_link + (2 * se_link)),
+                           right_lwr = ilink(fit_link - (2 * se_link)))
+# Check the confidence interval. It should not extend below 0 (negative counts
+# are impossible)
+min(gam_Dino_newdata$right_lwr) # Nice :)
+min(gam_Dino_newdata$fit_resp)
+max(gam_Dino_newdata$right_upr) # Nice too
+max(gam_Dino_newdata$fit_resp)
+# But we can see that the confidence interval is ridiculously small around the
+# min and max of the model fit.
+
+# Plot
+
+ggplot(gam_Dino_newdata, aes(x = Day, y = fit_resp))+
+  geom_ribbon(aes(x=Day, ymin=right_lwr, ymax=right_upr), fill = 'grey70', alpha=0.7) +
+  geom_line(linewidth = 1) +
+  geom_point(data = Season_Dino, aes(x = Day, y = true_count, color = Year), shape = 21) +
+  scale_color_viridis_c('Year') +
+  facet_wrap(facets = c('Code_point_Libelle')) +
+  theme_classic()
+
+# Saving plot
+# ggsave('gam_Dino_OL_all.tiff', dpi = 300, height = 120, width = 160, 
+#        units = 'mm', compression = 'lzw')
+
+# Saving data to make another plot in another script
+# write.csv2(gam_Dino_newdata, 'gam_Dino_multiyear_data.csv', row.names = FALSE,
+#            fileEncoding = 'ISO-8859-1')
+
+### Checking the model
 ModelOutputs<-data.frame(Fitted=fitted(gam_Dino),
                          Residuals=resid(gam_Dino))
 
@@ -103,9 +174,30 @@ ModelOutputs<-data.frame(Fitted=fitted(gam_Dino),
 # We base it on the structure of the model
 qq_data <- gam_Dino$model
 # then we add the values of fitted and residuals 
-# (they are in the same order as in the model)
+# (but are they in the same order as the model? -> need to check that)
 qq_data <- bind_cols(qq_data, ModelOutputs)
 
+# Plot : verify that true data matches (more or less) model fit
+ggplot(qq_data)+
+  geom_point(aes(x = Day, y = true_count), color = 'red') +
+  geom_point(aes(x = Day, y = Fitted), color = 'blue') +
+  facet_wrap(facets = c('Code_point_Libelle')) +
+  theme_classic() +
+  labs(y = "Dinophysis count", x = "Calendar day")
+
+# It matches! great!
+
+# Now for the "official" qq plot, with color of the points depending on site
+# Color palette
+# Blues for Northern Brittany: '#0A1635', '#2B4561'
+# Terra cotta for Pas de Calais: 'sienna4', 'tan3'
+pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646',
+                     '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
+
+# We need to reorder the factor 'Code_point_Libelle' so the sites appear in the
+# order we want
 qq_data_reordered <- qq_data %>%
   mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
                                           'Point 1 Boulogne', 'At so',
@@ -118,12 +210,6 @@ qq_data_reordered <- qq_data %>%
                                           'Sète mer', 'Diana centre')) %>%
   # we ungroup the data frame to produce only 1 qq-plot
   ungroup()
-
-# color palette for 16 sites
-pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered', 
-                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
-                     '#1F3700', '#649003','#F7B41D', '#FBB646',
-                     '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
 
 # And (qq-)plot
 qqplot_custom <- ggplot(qq_data_reordered) +
@@ -163,13 +249,25 @@ rm(HistRes_custom)
 rm(RvFplot_custom)
 rm(qqplot_custom)
 
-### Mesodinium
+# Mesodinium ####
 Season_Meso <- filter(Season_Meso, Code_point_Libelle != 'Parc Leucate 2'
                       & Code_point_Libelle != 'Sète mer')
 # Only zeros in these sites (not suitable for a Poisson
 # distribution)
 
-gam_Meso <- gam(data = Season_Meso, 
+# Formulate the GAM
+
+# Remove sites where we have only zeros (unmanageable for the model)
+Season_Meso_filter <- filter(Season_Meso, Code_point_Libelle != 'Parc Leucate 2'
+                             & Code_point_Libelle != 'Sète mer')
+# Only zeros in these sites (not suitable for a Poisson
+# distribution)
+
+# Transform Year as a factor for the random effect
+Season_Meso_factor <- Season_Meso_filter %>%
+  mutate(Year = as_factor(Year))
+
+gam_Meso <- gam(data = Season_Meso_factor, 
                 # Only a spline for the day of the year
                 # The use of a cyclic basis spline helps to make ends meet at the
                 # first and last days of the year
@@ -191,7 +289,138 @@ gam_Meso <- gam(data = Season_Meso,
 summary(gam_Meso)
 gam.check(gam_Meso)
 
-### QQ plots of both GAMs are quite shitty.
+# gam.check indicates that there might be an issue with the random effect
+# smooth for 'Year' (low p-value)
+
+# Create a new 'empty' dataset for storing model prediction (fit)
+gam_Meso_newdata <- expand_grid(Day=seq(1, 365),
+                                # We add a Year vector as it has become a factor
+                                # of the model
+                                Year=seq(min(Season_Meso$Year), 
+                                         max(Season_Meso$Year)),
+                                # We also add the site data
+                                Code_point_Libelle = unique(Season_Meso$Code_point_Libelle)) %>%
+  # And we need to remove the 2 sites that aren't in the model
+  filter(Code_point_Libelle != 'Sète mer' & Code_point_Libelle != 'Parc Leucate 2')
+
+## Get the inverse link function of the model
+# With this function, we can transform the prediction we make on the link
+#scale to the response scale
+ilink <- gam_Meso$family$linkinv
+
+## Predict : add fit and se.fit on the **link** scale
+gam_Meso_newdata <- bind_cols(gam_Meso_newdata, 
+                              setNames(as_tibble(
+                                predict(gam_Meso, gam_Meso_newdata, 
+                                        se.fit = TRUE, type = 'link')[1:2]),
+                                c('fit_link','se_link')))
+
+## Create the 95% confidence interval (2*standard error fit) and backtransform 
+# to response variable using the inverse link function
+gam_Meso_newdata <- mutate(gam_Meso_newdata,
+                           fit_resp  = ilink(fit_link),
+                           right_upr = ilink(fit_link + (2 * se_link)),
+                           right_lwr = ilink(fit_link - (2 * se_link)))
+# Check the confidence interval. It should not extend below 0 (negative counts
+# are impossible)
+min(gam_Meso_newdata$right_lwr) # Nice :)
+min(gam_Meso_newdata$fit_resp)
+max(gam_Meso_newdata$right_upr) # Nice too
+max(gam_Meso_newdata$fit_resp)
+# But we can see that the confidence interval is ridiculously small around the
+# min and max of the model fit.
+
+# Plot
+
+ggplot(gam_Meso_newdata, aes(x = Day, y = fit_resp))+
+  geom_ribbon(aes(x=Day, ymin=right_lwr, ymax=right_upr), fill = 'grey70', alpha=0.7) +
+  geom_line(linewidth = 1) +
+  geom_point(data = Season_Meso, aes(x = Day, y = true_count, color = Year), shape = 21) +
+  scale_color_viridis_c('Year') +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  theme_classic()
+
+### Checking the model
+ModelOutputs<-data.frame(Fitted=fitted(gam_Meso),
+                         Residuals=resid(gam_Meso))
+
+# We're gonna make our own qq plot with colors identifying sites
+# We base it on the structure of the model
+qq_data <- gam_Meso$model
+# then we add the values of fitted and residuals 
+# (but are they in the same order as the model? -> need to check that)
+qq_data <- bind_cols(qq_data, ModelOutputs)
+
+# Plot : verify that true data matches (more or less) model fit
+ggplot(qq_data)+
+  geom_point(aes(x = Day, y = true_count), color = 'red') +
+  geom_point(aes(x = Day, y = Fitted), color = 'blue') +
+  facet_wrap(facets = c('Code_point_Libelle')) +
+  theme_classic() +
+  labs(y = "Mesodinium count", x = "Calendar day")
+
+# It matches! great!
+
+# Now for the "official" qq plot, with color of the points depending on site
+# Color palette
+# Blues for Northern Brittany: '#0A1635', '#2B4561'
+# Terra cotta for Pas de Calais: 'sienna4', 'tan3'
+pheno_palette14 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646',
+                     '#DEB1CC', '#791D40')
+
+# We need to reorder the factor 'Code_point_Libelle' so the sites appear in the
+# order we want
+qq_data_reordered <- qq_data %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Bouzigues (a)', 'Diana centre')) %>%
+  # we ungroup the data frame to produce only 1 qq-plot
+  ungroup()
+
+# And (qq-)plot
+qqplot_custom <- ggplot(qq_data_reordered) +
+  stat_qq(aes(sample=Residuals, color = Code_point_Libelle), alpha = .7) +
+  stat_qq_line(aes(sample=Residuals, color = Code_point_Libelle)) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  scale_color_discrete(type = pheno_palette14, guide = 'none') +
+  theme_classic() +
+  labs(y="Sample Quantiles",x="Theoretical Quantiles")
+
+qqplot_custom
+
+# We can do the same for residuals vs fitted
+RvFplot_custom <- ggplot(qq_data_reordered)+
+  geom_point(aes(x = Fitted, y = Residuals, color = Code_point_Libelle), 
+             alpha = .7) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free') +
+  scale_color_discrete(type = pheno_palette14, guide = 'none') +
+  theme_classic() +
+  labs(y="Residuals",x="Fitted Values")
+
+RvFplot_custom
+
+# And let's do one last diagnostic plot with histogram of residuals
+HistRes_custom <- ggplot(qq_data_reordered, aes(x = Residuals, 
+                                                fill = Code_point_Libelle))+
+  geom_histogram(binwidth = 1)+
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free') +
+  scale_fill_discrete(type = pheno_palette14, guide = 'none') +
+  theme_classic() +
+  labs(x='Residuals', y = 'Count')
+
+HistRes_custom
+
+# Remove all the diagnostic plots
+rm(HistRes_custom)
+rm(RvFplot_custom)
+rm(qqplot_custom)
 
 
 #### Computing first derivative of GAMs ####
@@ -207,12 +436,15 @@ gam_Dino_newdata <- expand_grid(Day=seq(1, 365),
                                 # We also add the site data
                                 Code_point_Libelle = unique(Season_Dino$Code_point_Libelle))
 
+gam_Dino_newdata <- gam_Dino_newdata %>%
+  mutate(Year = as_factor(Year))
+
 
 ### Dinophysis
 gam_Dino.d <- derivatives(# The object of which we want to calculate derivatives
   gam_Dino,
   # On which smooth term do we want to calculate the derivative?
-  # term = 'Day',
+  term = 'Day',
   # # partial match for the term
   # partial_match = TRUE,
   # New data to be called upon
@@ -226,7 +458,7 @@ gam_Dino.d <- derivatives(# The object of which we want to calculate derivatives
   # The type of confidence interval to compute. We want simultaneous
   interval = 'simultaneous',
   # the number of simulations used in computing the simultaneous intervals
-  n_sim = 10000, # let's not start too big...
+  n_sim = 5000, # let's not start too big...
   # level of confidence interval (0.95 for 95% CI is default)
   level = 0.95,
   # Use the bayesian covariance matrix?
@@ -237,7 +469,7 @@ gam_Dino.d <- derivatives(# The object of which we want to calculate derivatives
 
 # It works!
 # Save the file
-# write.csv2(gam_Dino.d, 'Derivatives_GAM_Dino_12sites_20241003.csv',
+# write.csv2(gam_Dino.d, 'Derivatives_GAM_Dino_12sites_20241203.csv',
 #            row.names = FALSE, fileEncoding = 'ISO-8859-1')
 # Let's try to plot that shall we
 
@@ -285,7 +517,7 @@ ggplot(gam_Dino.d, aes(x = Day, y = .derivative,
 # That seems to work nicely
 
 # Saving plot
-# ggsave('DinoDeriv_12sites_phenology_20241003.tiff', dpi = 300, height = 225, width = 300,
+# ggsave('DinoDeriv_16sites_phenology_20241203.tiff', dpi = 300, height = 225, width = 300,
 #        units = 'mm', compression = 'lzw')
 
 ### We can also do that with only the sites we will analyse further
@@ -312,26 +544,30 @@ pheno_palette12 <- c('sienna4', 'tan3', 'red3', 'orangered',
                      '#1F3700', '#649003','#F7B41D', '#FBB646')
 
 # Select plot
-ggplot(gam_Dino.d_select, aes(x = data, y = derivative, 
+ggplot(gam_Dino.d_select, aes(x = Day, y = .derivative, 
                        color = Code_point_Libelle,
                        fill = Code_point_Libelle)) +
   # Confidence interval
-  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
+  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci), alpha = 0.2) +
   # Derivative fit
   geom_path(lwd = 1) +
   # Draw a line at 0 to separate accumulation from loss
-  geom_line(aes(x = data, y = 0), color = 'grey10', linewidth = .7) +
+  geom_line(aes(x = Day, y = 0), color = 'grey10', linewidth = .7) +
   labs(y = "1st derivative of Dinophysis GAM",
        x = "Day of the year",
        title = "1st derivative of Dinophysis GAM"
   ) +
-  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y',
-             # 4 rows to highlight the latitudinal change in phenology
-             nrow = 4) +
+  facet_wrap(facets = c('Code_point_Libelle'),
+             # 3 rows to highlight the latitudinal change in phenology
+             nrow = 3) +
   # Set the color palette :
   scale_color_discrete(type = pheno_palette12, guide = 'none') +
   scale_fill_discrete(type = pheno_palette12, guide = 'none') +
   theme_classic()
+
+# Saving plot
+# ggsave('DinoDeriv_12sites_phenology_20241203.tiff', dpi = 300, height = 225, width = 300,
+#        units = 'mm', compression = 'lzw')
 
 #### Annotating the derivatives ####
 ### We can assign ecological meaning to the derivatives
@@ -1126,3 +1362,150 @@ ggplot(gam_Dino.d_select) +
 # Saving the stratification plot
 # ggsave('Dinoderiv_stratif_12sites_large.tiff', dpi = 300, height = 200, width = 250,
 #        units = 'mm', compression = 'lzw')
+#### Beyond mgcv: Calculating gam derivative for every year ####
+
+## The problem with the derivatives() function from gratia is that it can't
+# calculate the derivative over random effects
+# But we would like to have the derivative calculated separately for each year!
+# This will be especially useful for our random forest model.
+# So, we're going to do it the old-fashioned way with the function calc_deriv()
+# of the gcplyr package
+
+# First, we get the gam fit data for several years
+gam_Dino_multiyear <- read.csv2('response_pred_GAMDino_20241129.csv', 
+                                header = TRUE, fileEncoding = 'ISO-8859-1')
+
+# We need to add a vector of x values that correspond to sequential days
+# from day 1 of 2007 to day 365 of 2022
+gam_Dino_multiyear <- gam_Dino_multiyear %>%
+  # To do this, we will exploit the fact that adding a number to an object of type
+  # 'Date' just adds the appropriate number of days.
+  # Create a month and day character variable, that is always '01-01'
+  mutate(MonthDay = '01-01') %>%
+  # Then unite it with Year to create something that will resemble a ymd date
+  mutate(CharYear = as.character(Year)) %>%
+  unite(Date, CharYear, MonthDay, sep = '-') %>%
+  # And make it a 'Date' object
+  mutate(Date = ymd(Date)) %>%
+  # Now, add Day-1 to each
+  mutate(Date = Date + (as.numeric(Day)-1)) %>%
+  # And voila, we have our vector of sequential numbers:
+  mutate(Date_number = as.numeric(Date))
+
+# Now we just have to apply the function calc_deriv to calculate the derivative
+gam_Dino_multiyear_deriv <- gam_Dino_multiyear %>%
+  mutate(deriv = calc_deriv(y = fit, x = Date_number, return = 'derivative',
+                            # Different derivative for each site
+                            subset_by = Code_point_Libelle))
+
+# We still need to do a few things
+# First, we need to discard all derivatives calculated on the 1st of january 
+# and 31st of december because of discontinuities between years
+gam_Dino_multiyear_deriv <- gam_Dino_multiyear_deriv %>%
+  filter(Day != 1) %>%
+  filter(Day != 365) %>%
+  # Reorder the sites
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Parc Leucate 2', 'Bouzigues (a)',
+                                          'Sète mer', 'Diana centre'))
+
+
+# Let's plot the derivative to verify it's approximately ok
+ggplot(gam_Dino_multiyear_deriv, aes(x = Day, y = deriv, 
+                       color = Code_point_Libelle,
+                       fill = Code_point_Libelle)) +
+  # Derivative fit
+  geom_path(lwd = 1) +
+  # Draw a line at 0 to separate accumulation from loss
+  geom_line(aes(x = Day, y = 0), color = 'grey10', linewidth = .7) +
+  labs(y = "1st derivative of Dinophysis GAM",
+       x = "Day of the year",
+       title = "1st derivative of Dinophysis GAM"
+  ) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  # Set the color palette :
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
+  theme_classic()
+
+# Save the data table with the derivative
+write.csv2(gam_Dino_multiyear_deriv, 'gam_Dino_multiyear_deriv_20241203.csv',
+           row.names = FALSE, fileEncoding = 'ISO-8859-1')
+
+# Testing the antifer gam with a plot
+gam_test_antifer <- gam_Dino_multiyear_deriv %>%
+  filter(Code_point_Libelle == 'Antifer ponton pétrolier')
+Season_Dino_Antifer <- Season_Dino %>%
+  filter(Code_point_Libelle == 'Antifer ponton pétrolier') %>%
+  mutate(Date = ymd(Date))
+
+ggplot() +
+  # plot the GAM
+  geom_ribbon(data = gam_test_antifer, aes(x = Day, ymin = lwrS, 
+                                     ymax = uprS),
+              color = '#7F96B6',
+              fill = '#BBD4F2',
+              linewidth = .75, alpha = .8) +
+  geom_line(data = gam_test_antifer, aes(x = Day, y = fit),
+            linewidth = 1,
+            color = '#435E7B') +
+  # plot the data
+  geom_point(data = Season_Dino_Antifer, aes(x = Day, y = true_count),
+             color = '#11203E', size = 4, shape = 8,
+             alpha = .3) +
+  # x axis as date and adding limits
+  # scale_x_date(limits = c(as_date('2018-01-01'), as_date('2022-12-31'))) +
+  # cut the y scale at 20
+  # scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(x = 'Date', y = 'Dinophysis cells observed in 10 mL') +
+  theme_classic()
+
+# Additional test: calculating the derivative on the link scale
+pp <- read.csv2('pred_plot_20241120_16sites.csv', 
+                header = TRUE, fileEncoding = 'ISO-8859-1')
+
+pp_deriv <- pp %>%
+  mutate(deriv = calc_deriv(y = median.fit, x = Day, return = 'derivative',
+                            # Different derivative for each site
+                            subset_by = Code_point_Libelle))
+
+pp_deriv <- pp_deriv %>%
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Parc Leucate 2', 'Bouzigues (a)',
+                                          'Sète mer', 'Diana centre'))
+
+# Plotting the derivative on the link scale
+ggplot(pp_deriv, aes(x = Day, y = deriv, 
+                                     color = Code_point_Libelle,
+                                     fill = Code_point_Libelle)) +
+  # Derivative fit
+  geom_path(lwd = 1) +
+  # Draw a line at 0 to separate accumulation from loss
+  geom_line(aes(x = Day, y = 0), color = 'grey10', linewidth = .7) +
+  labs(y = "1st derivative of Dinophysis GAM",
+       x = "Day of the year",
+       title = "1st derivative of Dinophysis GAM"
+  ) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  # Set the color palette :
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
+  theme_classic()
+
+# So this settles the matter: the function derivatives() from the gratia
+# package calculates derivatives on the link scale...
