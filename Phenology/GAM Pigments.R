@@ -914,19 +914,19 @@ plot_Allo_Cabourg <- ggplot() +
   # plot the GAM
   geom_ribbon(data = gam_Allo_Cabourg, aes(x = Day, ymin = lwrP, 
                                            ymax = uprP),
-              linewidth = .75, alpha = .2,
+              linewidth = .9, alpha = .2,
               color = 'orangered', fill = 'orangered') +
   geom_line(data = gam_Allo_Cabourg, aes(x = Day, y = median.fit),
-            linewidth = 1, color = 'orangered') +
+            linewidth = 1.25, color = 'orangered') +
   # plot the data
-  geom_point(data = Season_Allo_Cabourg, aes(x = Day, y = Allo), size = 2,
+  geom_point(data = Season_Allo_Cabourg, aes(x = Day, y = Allo), size = 3,
              alpha = .3, color = 'orangered') +
   # cut the y scale at 22
   #scale_y_continuous(limits = c(0,22)) +
   # Text
   labs(title = 'Cabourg',
        subtitle = 'Alloxanthin', x = 'Calendar day', 
-       y = 'Pigment concentration (microgram/L)') +
+       y = 'Alloxanthin') +
   theme_classic()
 
 plot_Allo_Cabourg
@@ -940,18 +940,18 @@ plot_Meso_Cabourg <- ggplot() +
   # plot the GAM
   geom_ribbon(data = gam_Meso_Cabourg, aes(x = Day, ymin = lwrP, 
                                            ymax = uprP),
-              linewidth = .75, alpha = .2,
+              linewidth = .9, alpha = .2,
               color = 'orangered', fill = 'orangered') +
   geom_line(data = gam_Meso_Cabourg, aes(x = Day, y = median.fit),
-            linewidth = 1, color = 'orangered') +
+            linewidth = 1.25, color = 'orangered') +
   # plot the data
-  geom_point(data = Season_Meso_Cabourg_crop, aes(x = Day, y = true_count), size = 2,
+  geom_point(data = Season_Meso_Cabourg_crop, aes(x = Day, y = true_count), size = 3,
              alpha = .3, color = 'orangered') +
   # cut the y scale at 22
   #scale_y_continuous(limits = c(0,22)) +
   # Text
   labs(subtitle = 'Mesodinium', x = 'Calendar day', 
-       y = 'Mesodinium cells observed in 10 mL') +
+       y = 'Mesodinium cells') +
   theme_classic()
 
 plot_Meso_Cabourg
@@ -960,6 +960,11 @@ plot_Meso_Cabourg
 # We crop out some points for visualisation
 Season_Dino_Cabourg_crop <- Season_Dino_Cabourg %>%
   filter(true_count < 50)
+
+# Import the derivative plot
+dino_deriv <- read.csv2('gam_Dino_multiyear_deriv_plot_select_20241204.csv',
+           header = TRUE, fileEncoding = 'ISO-8859-1')
+dino_deriv_Cabourg <- filter(dino_deriv, Code_point_Libelle == 'Cabourg')
 
 plot_Dino_Cabourg <- ggplot() +
   # plot the GAM
@@ -970,13 +975,21 @@ plot_Dino_Cabourg <- ggplot() +
   geom_line(data = gam_Dino_Cabourg, aes(x = Day, y = median.fit),
             linewidth = 1, color = 'orangered') +
   # plot the data
-  geom_point(data = Season_Dino_Cabourg_crop, aes(x = Day, y = true_count), size = 2,
+  geom_point(data = Season_Dino_Cabourg_crop, aes(x = Day, y = true_count), size = 3,
              alpha = .3, color = 'orangered') +
+  # Chenge the color palette
+  new_scale_color() +
+  scale_color_cmocean(name = 'curl', direction = -1, guide = "none") +
+  # Rugplot with the derivative of the Dinophysis GAM
+  geom_rug(data = dino_deriv_Cabourg, aes(x = Day, color = median.deriv),
+           linewidth = 1,
+           length = unit(0.2, 'cm'),
+  ) +
   # cut the y scale at 22
   #scale_y_continuous(limits = c(0,22)) +
   # Text
   labs(subtitle = 'Dinophysis', x = 'Calendar day', 
-       y = 'Dinophysis cells observed in 10 mL') +
+       y = 'Dinophysis cells') +
   theme_classic()
 
 plot_Dino_Cabourg
@@ -986,8 +999,9 @@ ggarrange(plot_Allo_Cabourg, plot_Meso_Cabourg, plot_Dino_Cabourg, nrow = 3,
           align = 'v')
 
 # Save the plot
-# ggsave('Succession_plot_Cabourg.tiff', height = 270, width = 140,
-#                dpi = 300, unit = 'mm', compression = 'lzw')
+# ggsave('Succession_plot_Cabourg.tiff', dpi = 300, height = 200, width = 225,
+#        units = 'mm', compression = 'lzw')
+
 ## Men er Roue ####
 
 # Alloxanthin
@@ -1068,19 +1082,19 @@ plot_Allo_OL <- ggplot() +
   # plot the GAM
   geom_ribbon(data = gam_Allo_OL, aes(x = Day, ymin = lwrP, 
                                        ymax = uprP),
-              linewidth = .75, alpha = .2,
+              linewidth = .9, alpha = .2,
               color = '#5995E3', fill = '#5995E3') +
   geom_line(data = gam_Allo_OL, aes(x = Day, y = median.fit),
-            linewidth = 1, color = '#5995E3') +
+            linewidth = 1.25, color = '#5995E3') +
   # plot the data
-  geom_point(data = Season_Allo_OL, aes(x = Day, y = Allo), size = 2,
+  geom_point(data = Season_Allo_OL, aes(x = Day, y = Allo), size = 3,
              alpha = .3, color = '#5995E3') +
   # cut the y scale at 22
   #scale_y_continuous(limits = c(0,22)) +
   # Text
   labs(title = 'Ouest Loscolo',
-       subtitle = 'Alloxanthin', x = 'Calendar day', 
-       y = 'Pigment concentration (microgram/L)') +
+       subtitle = 'Alloxanthin', x = NULL, 
+       y = 'Alloxanthin') +
   theme_classic()
 
 plot_Allo_OL
@@ -1090,39 +1104,49 @@ plot_Meso_OL <- ggplot() +
   # plot the GAM
   geom_ribbon(data = gam_Meso_OL, aes(x = Day, ymin = lwrP, 
                                        ymax = uprP),
-              linewidth = .75, alpha = .2,
+              linewidth = .9, alpha = .2,
               color = '#5995E3', fill = '#5995E3') +
   geom_line(data = gam_Meso_OL, aes(x = Day, y = median.fit),
-            linewidth = 1, color = '#5995E3') +
+            linewidth = 1.25, color = '#5995E3') +
   # plot the data
-  geom_point(data = Season_Meso_OL, aes(x = Day, y = true_count), size = 2,
+  geom_point(data = Season_Meso_OL, aes(x = Day, y = true_count), size = 3,
              alpha = .3, color = '#5995E3') +
   # cut the y scale at 22
   #scale_y_continuous(limits = c(0,22)) +
   # Text
-  labs(subtitle = 'Mesodinium', x = 'Calendar day', 
-       y = 'Mesodinium cells observed in 10 mL') +
+  labs(subtitle = 'Mesodinium', x = NULL, 
+       y = 'Mesodinium cells') +
   theme_classic()
 
 plot_Meso_OL
 
 # Dinophysis
+dino_deriv_OL <- filter(dino_deriv, Code_point_Libelle == 'Ouest Loscolo')
+
 plot_Dino_OL <- ggplot() +
   # plot the GAM
   geom_ribbon(data = gam_Dino_OL, aes(x = Day, ymin = lwrP, 
                                        ymax = uprP),
-              linewidth = .75, alpha = .2,
+              linewidth = .9, alpha = .2,
               color = '#5995E3', fill = '#5995E3') +
   geom_line(data = gam_Dino_OL, aes(x = Day, y = median.fit),
-            linewidth = 1, color = '#5995E3') +
+            linewidth = 1.25, color = '#5995E3') +
   # plot the data
-  geom_point(data = Season_Dino_OL, aes(x = Day, y = true_count), size = 2,
+  geom_point(data = Season_Dino_OL, aes(x = Day, y = true_count), size = 3,
              alpha = .3, color = '#5995E3') +
+  # Chenge the color palette
+  new_scale_color() +
+  scale_color_cmocean(name = 'curl', direction = -1, guide = "none") +
+  # Rugplot with the derivative of the Dinophysis GAM
+  geom_rug(data = dino_deriv_OL, aes(x = Day, color = median.deriv),
+           linewidth = 1,
+           length = unit(0.2, 'cm'),
+  ) +
   # cut the y scale at 22
   #scale_y_continuous(limits = c(0,22)) +
   # Text
   labs(subtitle = 'Dinophysis', x = 'Calendar day', 
-       y = 'Dinophysis cells observed in 10 mL') +
+       y = 'Dinophysis cells') +
   theme_classic()
 
 plot_Dino_OL
@@ -1132,5 +1156,5 @@ ggarrange(plot_Allo_OL, plot_Meso_OL, plot_Dino_OL, nrow = 3,
           align = 'v')
 
 # Save the plot
-# ggsave('Succession_plot_OL.tiff', height = 270, width = 140,
-#                dpi = 300, unit = 'mm', compression = 'lzw')
+# ggsave('Succession_plot_OL.tiff', dpi = 300, height = 200, width = 225,
+#        units = 'mm', compression = 'lzw')

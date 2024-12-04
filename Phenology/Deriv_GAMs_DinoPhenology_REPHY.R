@@ -1,6 +1,6 @@
 #### Derivatives of fitted GAMs for Dinophysis phenology ##
 ### V. POCHIC
-# 2024-12-03
+# 2024-12-04
 
 # /!\ This script requires data tables generated with the 'GAM Dino unified more sites' 
 # and 'GAM Meso unified' AND Dino_phenology_heatmaps scripts /!\
@@ -1131,7 +1131,7 @@ Table_stratif_daily <- left_join(Daily_basis, Table_stratif_fortnightly,
 
 # We want to plot the Dino derivative with the temperature as rugplot
 # A nice plot
-ggplot(gam_Dino.d_select) +
+ggplot(gam_Dino_multiyear_deriv_plot_select) +
   # First part of the plot: the rug plot
   # We use a color palette from the RColorBrewer package
   scale_color_distiller(palette = 'RdBu', direction = -1) +
@@ -1140,27 +1140,31 @@ ggplot(gam_Dino.d_select) +
            length = unit(0.5, 'cm')
   ) +
   # Labels
-  labs(y = "1st derivative of Dinophysis GAM",
+  labs(y = "Dinophysis change rate (cells/10mL/d-1)",
        x = "Day of the year",
        title = '1st derivative of Dinophysis GAM',
-       color = c(expression(paste('Sea surface temperature (°C)')))
+       color = 'Sea surface temperature (°C)'
   ) +
   # Change the color scale
   new_scale_color() +
   # Second part of plot: GAM derivatives
   # Confidence interval
-  geom_ribbon(aes(x = data, ymin = lower, ymax = upper,
+  geom_ribbon(aes(x = Day, ymin = lower, ymax = upper,
                   color = Code_point_Libelle,
                   fill = Code_point_Libelle), alpha = 0.2) +
   # Derivative fit
-  geom_path(aes(x = data, y = derivative, 
+  geom_path(aes(x = Day, y = median.deriv, 
                   color = Code_point_Libelle), lwd = 1) +
+  # Add 2 "ghost points" to force the limits of the y-axis to [-0.1 ; 0.1]
+  geom_point(aes(x = 1, y = 0.1), color = 'transparent', fill = 'transparent') +
+  geom_point(aes(x = 1, y = -0.1), color = 'transparent', fill = 'transparent') +
   # Draw a line at 0 to separate accumulation from loss
-  geom_line(aes(x = data, y = 0), color = 'grey10', linewidth = .7) +
-  facet_wrap(facets = c('Code_point_Libelle')) + #, scales = 'free_y'
+  geom_line(aes(x = Day, y = 0), color = 'grey10', linewidth = .7) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y',
+             nrow = 3) +
   # Set the color palette :
-  scale_color_discrete(type = pheno_palette16, guide = 'none') +
-  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette12, guide = 'none') +
   # Theme
   theme(plot.title = element_text(size = 11), 
         # Axis
@@ -1189,7 +1193,7 @@ ggplot(gam_Dino.d_select) +
 #        units = 'mm', compression = 'lzw')
 
 # Now with salinity
-ggplot(gam_Dino.d_select) +
+ggplot(gam_Dino_multiyear_deriv_plot_select) +
   # First part of the plot: the rug plot
   # We use a color palette from the cmocean package
   scale_color_cmocean(name = 'haline') +
@@ -1198,27 +1202,31 @@ ggplot(gam_Dino.d_select) +
            length = unit(0.5, 'cm')
   ) +
   # Labels
-  labs(y = "1st derivative of Dinophysis GAM",
+  labs(y = "Dinophysis change rate (cells/10mL/d-1)",
        x = "Day of the year",
        title = '1st derivative of Dinophysis GAM',
-       color = c(expression(paste('Sea surface salinity (PSU)')))
+       color = 'Sea surface salinity (PSU)'
   ) +
   # Change the color scale
   new_scale_color() +
   # Second part of plot: GAM derivatives
   # Confidence interval
-  geom_ribbon(aes(x = data, ymin = lower, ymax = upper,
+  geom_ribbon(aes(x = Day, ymin = lower, ymax = upper,
                   color = Code_point_Libelle,
                   fill = Code_point_Libelle), alpha = 0.2) +
   # Derivative fit
-  geom_path(aes(x = data, y = derivative, 
+  geom_path(aes(x = Day, y = median.deriv, 
                 color = Code_point_Libelle), lwd = 1) +
   # Draw a line at 0 to separate accumulation from loss
-  geom_line(aes(x = data, y = 0), color = 'grey10', linewidth = .7) +
-  facet_wrap(facets = c('Code_point_Libelle')) + # , scales = 'free_y'
+  geom_line(aes(x = Day, y = 0), color = 'grey10', linewidth = .7) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y',
+             nrow = 3) +
+  # Add 2 "ghost points" to force the limits of the y-axis to [-0.1 ; 0.1]
+  geom_point(aes(x = 1, y = 0.1), color = 'transparent', fill = 'transparent') +
+  geom_point(aes(x = 1, y = -0.1), color = 'transparent', fill = 'transparent') +
   # Set the color palette :
-  scale_color_discrete(type = pheno_palette16, guide = 'none') +
-  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette12, guide = 'none') +
   # Theme
   theme(plot.title = element_text(size = 11), 
         # Axis
@@ -1247,7 +1255,7 @@ ggplot(gam_Dino.d_select) +
 #        units = 'mm', compression = 'lzw')
 
 # Now with chl a
-ggplot(gam_Dino.d_select) +
+ggplot(gam_Dino_multiyear_deriv_plot_select) +
   # First part of the plot: the rug plot
   # We use a color palette from the cmocean package
   scale_color_cmocean(name = 'algae') +
@@ -1255,29 +1263,34 @@ ggplot(gam_Dino.d_select) +
            linewidth = .3,
            length = unit(0.5, 'cm')
   ) +
-  # Labels
-  labs(y = "1st derivative of Dinophysis GAM",
+  # Labels --> There's shit going on with expressions, i don't know why
+  labs(y = "Dinophysis change rate (cells/10mL/d-1)",
        x = "Day of the year",
        title = '1st derivative of Dinophysis GAM',
-       color = c(expression(paste('Chlorophyll ',italic('a'),
-                                  ' concentration (mg.m'^'3',')')))
+       color = 'Chlorophyll a concentration (mg.m-3)'
+         # paste('Chlorophyll ', italic('a'),
+         #                          expression(' concentration (mg.m'^'3'),')')
   ) +
   # Change the color scale
   new_scale_color() +
   # Second part of plot: GAM derivatives
   # Confidence interval
-  geom_ribbon(aes(x = data, ymin = lower, ymax = upper,
+  geom_ribbon(aes(x = Day, ymin = lower, ymax = upper,
                   color = Code_point_Libelle,
                   fill = Code_point_Libelle), alpha = 0.2) +
   # Derivative fit
-  geom_path(aes(x = data, y = derivative, 
+  geom_path(aes(x = Day, y = median.deriv, 
                 color = Code_point_Libelle), lwd = 1) +
   # Draw a line at 0 to separate accumulation from loss
-  geom_line(aes(x = data, y = 0), color = 'grey10', linewidth = .7) +
-  facet_wrap(facets = c('Code_point_Libelle')) + # , scales = 'free_y'
+  geom_line(aes(x = Day, y = 0), color = 'grey10', linewidth = .7) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y',
+    nrow = 3) +
+  # Add 2 "ghost points" to force the limits of the y-axis to [-0.1 ; 0.1]
+  geom_point(aes(x = 1, y = 0.1), color = 'transparent', fill = 'transparent') +
+  geom_point(aes(x = 1, y = -0.1), color = 'transparent', fill = 'transparent') +
   # Set the color palette :
-  scale_color_discrete(type = pheno_palette16, guide = 'none') +
-  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette12, guide = 'none') +
   # Theme
   theme(plot.title = element_text(size = 11), 
         # Axis
@@ -1306,7 +1319,7 @@ ggplot(gam_Dino.d_select) +
 #        units = 'mm', compression = 'lzw')
 
 # Now with the stratification index
-ggplot(gam_Dino.d_select) +
+ggplot(gam_Dino_multiyear_deriv_plot_select) +
   # First part of the plot: the rug plot
   # We use a color palette from the cmocean package
   scale_color_cmocean(name = 'tempo') +
@@ -1315,27 +1328,31 @@ ggplot(gam_Dino.d_select) +
            length = unit(0.5, 'cm')
   ) +
   # Labels
-  labs(y = "1st derivative of Dinophysis GAM",
+  labs(y = "Dinophysis change rate (cells/10mL/d-1",
        x = "Day of the year",
        title = '1st derivative of Dinophysis GAM',
-       color = 'Stratification Index (-)'
+       color = '14-day Stratification Index (-)'
   ) +
   # Change the color scale
   new_scale_color() +
   # Second part of plot: GAM derivatives
   # Confidence interval
-  geom_ribbon(aes(x = data, ymin = lower, ymax = upper,
+  geom_ribbon(aes(x = Day, ymin = lower, ymax = upper,
                   color = Code_point_Libelle,
                   fill = Code_point_Libelle), alpha = 0.2) +
   # Derivative fit
-  geom_path(aes(x = data, y = derivative, 
+  geom_path(aes(x = Day, y = median.deriv, 
                 color = Code_point_Libelle), lwd = 1) +
   # Draw a line at 0 to separate accumulation from loss
-  geom_line(aes(x = data, y = 0), color = 'grey10', linewidth = .7) +
-  facet_wrap(facets = c('Code_point_Libelle')) + # , scales = 'free_y'
+  geom_line(aes(x = Day, y = 0), color = 'grey10', linewidth = .7) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y',
+             nrow = 3) +
+  # Add 2 "ghost points" to force the limits of the y-axis to [-0.1 ; 0.1]
+  geom_point(aes(x = 1, y = 0.1), color = 'transparent', fill = 'transparent') +
+  geom_point(aes(x = 1, y = -0.1), color = 'transparent', fill = 'transparent') +
   # Set the color palette :
-  scale_color_discrete(type = pheno_palette16, guide = 'none') +
-  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette12, guide = 'none') +
   # Theme
   theme(plot.title = element_text(size = 11), 
         # Axis
@@ -1362,6 +1379,7 @@ ggplot(gam_Dino.d_select) +
 # Saving the stratification plot
 # ggsave('Dinoderiv_stratif_12sites_large.tiff', dpi = 300, height = 200, width = 250,
 #        units = 'mm', compression = 'lzw')
+
 #### Beyond mgcv: Calculating gam derivative for every year ####
 
 ## The problem with the derivatives() function from gratia is that it can't
@@ -1396,12 +1414,24 @@ gam_Dino_multiyear <- gam_Dino_multiyear %>%
 gam_Dino_multiyear_deriv <- gam_Dino_multiyear %>%
   mutate(deriv = calc_deriv(y = fit, x = Date_number, return = 'derivative',
                             # Different derivative for each site
+                            subset_by = Code_point_Libelle)) %>%
+  mutate(deriv_upperS = calc_deriv(y = uprS, x = Date_number, return = 'derivative',
+                            # Different derivative for each site
+                            subset_by = Code_point_Libelle)) %>%
+  mutate(deriv_lowerS = calc_deriv(y = lwrS, x = Date_number, return = 'derivative',
+                            # Different derivative for each site
                             subset_by = Code_point_Libelle))
+
+# Now to plot this, we group by site and Day and compute a median, the min and max
+gam_Dino_multiyear_deriv_plot <- gam_Dino_multiyear_deriv %>%
+  group_by(Code_point_Libelle, Day) %>%
+  summarise(median.deriv = median(deriv), upper = max(deriv_upperS), 
+            lower = min(deriv_lowerS), .groups = 'keep')
 
 # We still need to do a few things
 # First, we need to discard all derivatives calculated on the 1st of january 
 # and 31st of december because of discontinuities between years
-gam_Dino_multiyear_deriv <- gam_Dino_multiyear_deriv %>%
+gam_Dino_multiyear_deriv_plot <- gam_Dino_multiyear_deriv_plot %>%
   filter(Day != 1) %>%
   filter(Day != 365) %>%
   # Reorder the sites
@@ -1416,28 +1446,53 @@ gam_Dino_multiyear_deriv <- gam_Dino_multiyear_deriv %>%
                                           'Parc Leucate 2', 'Bouzigues (a)',
                                           'Sète mer', 'Diana centre'))
 
+# Select only 12 sites on the Atlantic/Channel coast
+gam_Dino_multiyear_deriv_plot_select <- gam_Dino_multiyear_deriv_plot %>%
+  filter(Code_point_Libelle %in% c('Point 1 Boulogne', 'At so',
+                                   'Antifer ponton pétrolier', 'Cabourg',
+                                   'les Hébihens', 'Loguivy',
+                                   'Men er Roue', 'Ouest Loscolo',
+                                   'Le Cornard', 'Auger',
+                                   'Arcachon - Bouée 7', 'Teychan bis'))
+
+# Save that for use in another script
+# write.csv2(gam_Dino_multiyear_deriv_plot_select, 'gam_Dino_multiyear_deriv_plot_select_20241204.csv',
+#                       row.names = FALSE, fileEncoding = 'ISO-8859-1')
 
 # Let's plot the derivative to verify it's approximately ok
-ggplot(gam_Dino_multiyear_deriv, aes(x = Day, y = deriv, 
+ggplot(gam_Dino_multiyear_deriv_plot_select, aes(x = Day, y = median.deriv, 
                        color = Code_point_Libelle,
                        fill = Code_point_Libelle)) +
+  # Confidence interval
+  geom_ribbon(aes(ymin = lower, ymax = upper, color = Code_point_Libelle,
+                  fill = Code_point_Libelle), alpha = 0.2) +
   # Derivative fit
   geom_path(lwd = 1) +
   # Draw a line at 0 to separate accumulation from loss
   geom_line(aes(x = Day, y = 0), color = 'grey10', linewidth = .7) +
-  labs(y = "1st derivative of Dinophysis GAM",
+  labs(y = "Dinophysis change rate (cells/10mL/d-1)",
        x = "Day of the year",
        title = "1st derivative of Dinophysis GAM"
   ) +
-  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  # Add 2 "ghost points" to force the limits of the y-axis to [-0.1 ; 0.1]
+  geom_point(aes(x = 1, y = 0.1), color = 'transparent', fill = 'transparent') +
+  geom_point(aes(x = 1, y = -0.1), color = 'transparent', fill = 'transparent') +
+  # Separate by site
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y',
+             # 3 rows to highlight the latitudinal change in phenology
+             nrow = 3) +
   # Set the color palette :
-  scale_color_discrete(type = pheno_palette16, guide = 'none') +
-  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette12, guide = 'none') +
   theme_classic()
 
+# Save the plot
+# ggsave('DinoDeriv_12sites_phenology_20241204.tiff', dpi = 300, height = 225, width = 300,
+#        units = 'mm', compression = 'lzw')
+
 # Save the data table with the derivative
-write.csv2(gam_Dino_multiyear_deriv, 'gam_Dino_multiyear_deriv_20241203.csv',
-           row.names = FALSE, fileEncoding = 'ISO-8859-1')
+# write.csv2(gam_Dino_multiyear_deriv, 'gam_Dino_multiyear_deriv_20241204.csv',
+#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
 
 # Testing the antifer gam with a plot
 gam_test_antifer <- gam_Dino_multiyear_deriv %>%
