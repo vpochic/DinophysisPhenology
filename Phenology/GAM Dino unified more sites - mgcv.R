@@ -1,6 +1,6 @@
 ###### GAM for Dinophysis phenology with mgcv - unified 2 ###
 ## V. POCHIC
-# 2024-11-20
+# 2024-12-12
 
 # In this version of the script we add the sites in Pas de Calais 
 # ('Point 1 Boulogne' and 'At so') and in Northern Britanny ('les Hébihens' and 
@@ -188,6 +188,55 @@ ggplot(plotDino_OL)+
 # Save the plot
 # ggsave('plotDino_composite-year_OL_zeros.tiff', height = 150, width = 300,
 # dpi = 300, unit = 'mm', compression = 'lzw')
+
+#### Evolution over the study period ####
+
+# One question is: did the phenology of Dinophysis evolve over the study
+# period (2007-2022)?
+# The GAM we designed is not adequate to answer this question. A **very basic** 
+# way to investigate it is to look at the date of the maximum for each site, for
+# each year, and check if there is a trend
+
+Season_Dino_nozeros <- Season_Dino %>%
+  filter(true_count != 0)
+
+Maxima_Dino <- Season_Dino_nozeros %>%
+  # group
+  group_by(Code_point_Libelle, Year) %>%
+  # extract rows with yearly maxima of 'true_count' (slice() retains groups)
+  slice(which.max(true_count)) %>%
+  # Code_point_Libelle as factor
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Parc Leucate 2', 'Bouzigues (a)',
+                                          'Sète mer', 'Diana centre'))
+
+# Color palette
+pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646',
+                     '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
+
+ggplot(Maxima_Dino, aes(x = Year, y = Day, color = Code_point_Libelle)) +
+  geom_point(size = 4, alpha = .8) +
+  # add linear regression fit
+  geom_smooth(method = 'lm', alpha = .3) +
+  # aesthetics
+  facet_wrap(facets = 'Code_point_Libelle') +
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  scale_y_discrete(limits = c(1, 100, 200, 300, 365)) +
+  labs(y = 'Day of maximum Dinophysis count') +
+  theme_classic()
+
+# That's dope
+# ggsave('Maxima_plot_16sites.tiff', dpi = 300, height = 175, width = 250,
+#                units = 'mm', compression = 'lzw')
 
 #### Where the zeros lie ####
 
@@ -674,6 +723,14 @@ pred <- transform(cbind(data.frame(pred), newd),
                   uprS = fit + (crit * se.fit),
                   lwrS = fit - (crit * se.fit))
 
+# Calculating response_pred -> the gam fitted on every year on the repsonse
+# scale
+response_pred <- pred %>%
+  mutate(across(c('fit', 'lwrS', 'uprS', 'lwrP', 'uprP'), ~ ilink(.)))
+
+# Save response_pred
+write.csv2(response_pred, 'response_pred_GAMDino_20241129.csv', row.names = FALSE,
+           fileEncoding = 'ISO-8859-1')
 
 # Constructing a CI based on maximum and minimum simultaneous interval for
 # plotting
