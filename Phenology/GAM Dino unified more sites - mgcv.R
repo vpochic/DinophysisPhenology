@@ -12,6 +12,7 @@ library(ggplot2)
 library(mgcv)
 library(gratia)
 library(viridis)
+library(cmocean)
 library(nlme)
 
 ### Additional stuff (deriv function notably)
@@ -217,6 +218,13 @@ Maxima_Dino <- Season_Dino_nozeros %>%
                                           'Parc Leucate 2', 'Bouzigues (a)',
                                           'Sète mer', 'Diana centre'))
 
+# Getting some stats
+Maxima_Dino_stats <- Maxima_Dino %>%
+  group_by(Code_point_Libelle) %>%
+  summarise(median_daymax = median(Day), mean_daymax = mean(Day), 
+            stdev_daymax = sd(Day), min_daymax = min(Day), max_daymax = max(Day),
+            .groups = 'keep') 
+
 # Color palette
 pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered', 
                      '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
@@ -237,6 +245,131 @@ ggplot(Maxima_Dino, aes(x = Year, y = Day, color = Code_point_Libelle)) +
 # That's dope
 # ggsave('Maxima_plot_16sites.tiff', dpi = 300, height = 175, width = 250,
 #                units = 'mm', compression = 'lzw')
+
+
+# Here we will call a table of environmental data to plot a heatmap
+# underneath our Dinophysis data
+# This table was created by the script "Dino_phenology_heatmaps.R"
+
+Table_hydro_daily <- read.csv2('Table_hydro_daily_20240821.csv', 
+                                     header = TRUE,
+                                     fileEncoding = 'ISO-8859-1')
+
+# Now, we plot! First, what we want to do is to have an idea of the distribution
+# of Dinophysis maxima for each site. We will focus on Channel/Atlantic sites,
+# and only those where we observe Dinophysis
+Table_hydro_daily_select <- filter(Table_hydro_daily,
+                                   Code_point_Libelle %in%
+                                     c('Antifer ponton pétrolier', 'Cabourg',
+                                       'Men er Roue', 'Ouest Loscolo',
+                                       'Le Cornard', 'Auger',
+                                       'Arcachon - Bouée 7', 'Teychan bis'))
+Maxima_Dino_stats_select <- filter(Maxima_Dino_stats,
+                                   Code_point_Libelle %in%
+                                     c('Antifer ponton pétrolier', 'Cabourg',
+                                       'Men er Roue', 'Ouest Loscolo',
+                                       'Le Cornard', 'Auger',
+                                       'Arcachon - Bouée 7', 'Teychan bis'))
+Maxima_Dino_select <- filter(Maxima_Dino,
+                                   Code_point_Libelle %in%
+                                     c('Antifer ponton pétrolier', 'Cabourg',
+                                       'Men er Roue', 'Ouest Loscolo',
+                                       'Le Cornard', 'Auger',
+                                       'Arcachon - Bouée 7', 'Teychan bis'))
+
+# New color scale
+pheno_palette8 <- c('red3', 'orangered', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646')
+
+# First, let's plot the distribution of the maxima (without the heatmap)
+ggplot(Maxima_Dino_stats_select, aes(color = Code_point_Libelle)) +
+  # All observations as small translucid points
+  geom_point(data = Maxima_Dino_select, aes(x = Day, y = Code_point_Libelle, 
+                                     color = Code_point_Libelle), 
+             size = 3, alpha = .5) +
+  scale_color_discrete(type = pheno_palette8, guide = 'none') +
+  scale_x_continuous(limits = c(1,365), breaks = c(1, 100, 200, 300, 365)) +
+  # reverse y axis to get sites in the desired order
+  scale_y_discrete(limits = rev) +
+  labs(x = 'Day of the year', y = NULL) +
+  theme_classic()
+
+# Now we try to underlie a heatmap of chl a seasonality
+ggplot(Maxima_Dino_stats_select) +
+  geom_tile(data = Table_hydro_daily_select, 
+            aes(x = Day, y = Code_point_Libelle, fill = CHLOROA.med), 
+            alpha = .8) +
+  # color palette for fill
+  # All observations as small translucid points
+  geom_point(data = Maxima_Dino_select, aes(x = Day, y = Code_point_Libelle, 
+                                            color = Code_point_Libelle), 
+             size = 3, alpha = .5) +
+  scale_color_discrete(type = pheno_palette8, guide = 'none') +
+  scale_x_continuous(limits = c(1,365), breaks = c(1, 100, 200, 300, 365)) +
+  # reverse y axis to get sites in the desired order
+  scale_y_discrete(limits = rev) +
+  scale_fill_cmocean(name = 'algae') +
+  labs(x = 'Day of the year', y = NULL, fill = 'Median [chl a]') +
+  theme(plot.title = element_text(size = 11), 
+        # Axis
+        axis.title.x = element_text(size=10), 
+        axis.title.y =element_text(size=10), 
+        axis.text = element_text(size=8, color = 'black'),
+        axis.line.x = element_line(linewidth = .2, color = 'black'),
+        axis.line.y = element_line(linewidth = .2, color = 'black'),
+        # Legend
+        legend.background = element_rect(linewidth = .5, color = 'grey10'),
+        legend.title = element_text(size = 10, color = 'grey5'),
+        legend.frame = element_rect(linewidth = .5, color = 'grey10'),
+        legend.ticks = element_line(linewidth = .2, color = 'grey25'),
+        legend.position = 'bottom',
+        # Panel
+        panel.grid = element_blank(),
+        panel.background = element_blank(),
+        # Facet labels
+        strip.background = element_rect(fill = 'transparent',
+                                        linewidth = 1,
+                                        color = 'grey10'),
+        strip.text = element_text(color = 'grey5', size = 7.5))
+
+# Nice one. Let's save that
+# ggsave('Dino_max_chloroa.tiff', dpi = 300, height = 180, width = 150, 
+#        units = 'mm', compression = 'lzw')
+
+### We can do the same with Meosdinium ###
+
+# Mesodinium file
+# Season_Meso <- read.csv2('Season_Meso.csv', header = TRUE,
+#                          fileEncoding = 'ISO-8859-1')
+
+# Removing zeros
+Season_Meso_nozeros <- Season_Meso %>%
+  filter(true_count != 0)
+
+Maxima_Meso <- Season_Meso_nozeros %>%
+  # group
+  group_by(Code_point_Libelle, Year) %>%
+  # extract rows with yearly maxima of 'true_count' (slice() retains groups)
+  slice(which.max(true_count)) %>%
+  # Code_point_Libelle as factor
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Bouzigues (a)', 'Diana centre'))
+
+# Getting some stats
+Maxima_Meso_stats <- Maxima_Meso %>%
+  group_by(Code_point_Libelle) %>%
+  summarise(median_daymax = median(Day), mean_daymax = mean(Day),
+            stdev_daymax = sd(Day), min_daymax = min(Day), max_daymax = max(Day),
+            .groups = 'keep')
+
+
 
 #### Where the zeros lie ####
 
