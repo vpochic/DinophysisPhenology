@@ -530,8 +530,8 @@ response_pred_plot <- pred %>%
 
 # Transform values so they are expressed in the response variable units
 # (by applying the inverse link function)
-response_pred_plot <- as.data.frame(pred_plot) %>%
-  mutate(across(c('median.fit', 'lwrS', 'uprS', 'lwrP', 'uprP'), ~ ilink(.)))
+# response_pred_plot <- as.data.frame(pred_plot) %>%
+#   mutate(across(c('median.fit', 'lwrS', 'uprS', 'lwrP', 'uprP'), ~ ilink(.)))
 
 # And save that shall we
 # write.csv2(response_pred_plot, 'response_pred_plot_Allox_20241122_4sites.csv',
@@ -978,13 +978,13 @@ plot_Dino_Cabourg <- ggplot() +
   geom_point(data = Season_Dino_Cabourg_crop, aes(x = Day, y = true_count), size = 3,
              alpha = .3, color = 'orangered') +
   # Chenge the color palette
-  new_scale_color() +
-  scale_color_cmocean(name = 'curl', direction = -1, guide = "none") +
-  # Rugplot with the derivative of the Dinophysis GAM
-  geom_rug(data = dino_deriv_Cabourg, aes(x = Day, color = median.deriv),
-           linewidth = 1,
-           length = unit(0.2, 'cm'),
-  ) +
+  # new_scale_color() +
+  # scale_color_cmocean(name = 'curl', direction = -1, guide = "none") +
+  # # Rugplot with the derivative of the Dinophysis GAM
+  # geom_rug(data = dino_deriv_Cabourg, aes(x = Day, color = median.deriv),
+  #          linewidth = 1,
+  #          length = unit(0.2, 'cm'),
+  #) +
   # cut the y scale at 22
   #scale_y_continuous(limits = c(0,22)) +
   # Text
@@ -995,11 +995,18 @@ plot_Dino_Cabourg <- ggplot() +
 plot_Dino_Cabourg
 
 # Arrange the plot
-ggarrange(plot_Allo_Cabourg, plot_Meso_Cabourg, plot_Dino_Cabourg, nrow = 3,
-          align = 'v')
+succession_plot_cabourg <- ggarrange(plot_Allo_Cabourg + rremove("xlab"),
+                                     plot_Meso_Cabourg + rremove("xlab"),
+                                     plot_Dino_Cabourg + rremove("xlab"),
+                                     nrow = 3,
+                                     align = 'v')
+
+# Common y-axis
+annotate_figure(succession_plot_cabourg,
+                bottom = textGrob('Julian day'))
 
 # Save the plot
-# ggsave('Succession_plot_Cabourg.tiff', dpi = 300, height = 200, width = 225,
+# ggsave('Succession_plot_Cabourg2.tiff', dpi = 300, height = 164, width = 164,
 #        units = 'mm', compression = 'lzw')
 
 ## Men er Roue ####
@@ -1134,14 +1141,14 @@ plot_Dino_OL <- ggplot() +
   # plot the data
   geom_point(data = Season_Dino_OL, aes(x = Day, y = true_count), size = 3,
              alpha = .3, color = '#5995E3') +
-  # Chenge the color palette
-  new_scale_color() +
-  scale_color_cmocean(name = 'curl', direction = -1, guide = "none") +
-  # Rugplot with the derivative of the Dinophysis GAM
-  geom_rug(data = dino_deriv_OL, aes(x = Day, color = median.deriv),
-           linewidth = 1,
-           length = unit(0.2, 'cm'),
-  ) +
+  # # Chenge the color palette
+  # new_scale_color() +
+  # scale_color_cmocean(name = 'curl', direction = -1, guide = "none") +
+  # # Rugplot with the derivative of the Dinophysis GAM
+  # geom_rug(data = dino_deriv_OL, aes(x = Day, color = median.deriv),
+  #          linewidth = 1,
+  #          length = unit(0.2, 'cm'),
+  # ) +
   # cut the y scale at 22
   #scale_y_continuous(limits = c(0,22)) +
   # Text
@@ -1152,9 +1159,16 @@ plot_Dino_OL <- ggplot() +
 plot_Dino_OL
 
 # Arrange the plot
-ggarrange(plot_Allo_OL, plot_Meso_OL, plot_Dino_OL, nrow = 3,
-          align = 'v')
+succession_plot_OL <- ggarrange(plot_Allo_OL + rremove("xlab"),
+                                     plot_Meso_OL + rremove("xlab"),
+                                     plot_Dino_OL + rremove("xlab"),
+                                     nrow = 3,
+                                     align = 'v')
+
+# Common y-axis
+annotate_figure(succession_plot_OL,
+                bottom = textGrob('Julian day'))
 
 # Save the plot
-# ggsave('Succession_plot_OL.tiff', dpi = 300, height = 200, width = 225,
+# ggsave('Succession_plot_OL2.tiff', dpi = 300, height = 164, width = 164,
 #        units = 'mm', compression = 'lzw')
