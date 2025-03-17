@@ -1,5 +1,5 @@
 ### SCOPUS Dinophysis ###
-# V. POCHIC, 2025-02-26
+# V. POCHIC, 2025-03-17
 
 # A little script to plot data from SCOPUS on Dinophysis and other 
 # dinoflagellate genera in the scientific literature.
@@ -22,7 +22,7 @@ library(tidyverse)
 # for search on:
 
 # "Dinophysis"
-SCOPUS_dinophysis <- read.csv(file = 'SCOPUS/data/Scopus-10-Analyze-Year_all-fields_dinophysis.csv',
+SCOPUS_dinophysis <- read.csv(file = 'SCOPUS/data/Scopus-10-Analyze-Year_all-fields_Dinophysis.csv',
                                   header = FALSE) %>%
   # Remove first 4 rows that are useless
   slice_tail(n=-4) %>%
