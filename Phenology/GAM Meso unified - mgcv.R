@@ -1,6 +1,6 @@
 ###### GAM for Mesodinium phenology with mgcv - unified ###
 ## V. POCHIC
-# 2024-11-21
+# 2025-03-18
 
 #### Packages and functions ####
 library(tidyverse)
@@ -47,7 +47,8 @@ Table_Meso_zeros <- Table_phyto_OL %>%
   pivot_wider(names_from = Taxon, values_from = Comptage, values_fill = 0) %>%
   select(starts_with('Mesodinium') | 
            contains(c('Code.Region', 'Code_point_Libelle', 'Year', 'Month',
-                      'Date', 'Code.parametre', 'SALI', 'TEMP')))
+                      'Date', 'Heure', 'Code.parametre', 'SALI', 'TEMP', 
+                      'Longitude', 'Latitude', 'ID.interne.passage')))
 
 Table_Meso_zeros <- Table_Meso_zeros %>%
   # Getting rid of some unwelcome guests (who got onboard because the taxon
@@ -112,7 +113,7 @@ hist(Season_Meso$Day, breaks = 26)
 # This seems quite fine!!!
 
 # Let's save that
-# write.csv2(Season_Meso, 'Season_Meso.csv', row.names = FALSE,
+# write.csv2(Season_Meso, 'Season_Meso_20250318.csv', row.names = FALSE,
 #            fileEncoding = "ISO-8859-1")
 
 #### Where the zeros lie ####
