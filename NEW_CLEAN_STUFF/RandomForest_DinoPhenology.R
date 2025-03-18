@@ -662,7 +662,7 @@ ggplot(Table_data_RF2) +
 # continuous
 
 ggplot(Table_data_RF2)+
-  geom_point(aes(x=Date, y=Allo, color = Code_point_Libelle), 
+  geom_point(aes(x=Day, y=Allo, color = Code_point_Libelle), 
              alpha = .7) +
   facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
   scale_color_discrete(type = palette_4sites, guide = 'none') +
