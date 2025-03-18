@@ -56,7 +56,56 @@ Season_Dino_12sites <- filter(Season_Dino, Code_point_Libelle %in%
   # And get the Date variable in the right format
   mutate(Date = ymd(Date))
 
-## Part 2: gam derivative data ####
+## Part 2: Mesodinium sampling data ####
+# That's the file Season_Meso.csv with all sampling events in all sites for
+# 2007-2022
+Season_Meso <- read.csv2('Season_Meso_20250318.csv', header = TRUE, 
+                         fileEncoding = 'ISO-8859-1')
+
+
+Season_Meso_12sites <- filter(Season_Meso, Code_point_Libelle %in% 
+                                c(# Pas de Calais
+                                  'Point 1 Boulogne', 'At so',
+                                  # Baie de Seine
+                                  'Antifer ponton pétrolier', 'Cabourg',
+                                  # Bretagne Nord
+                                  'les Hébihens', 'Loguivy',
+                                  # Bretagne Sud
+                                  'Men er Roue', 'Ouest Loscolo',
+                                  # Pertuis charentais
+                                  'Auger', 'Le Cornard',
+                                  # Arcachon
+                                  'Arcachon - Bouée 7', 'Teychan bis')) %>%
+  # Get rid of the potential cases in which Heure is ""
+  filter(Heure != "") %>%
+  # Get a date-time variable by pasting together date and time
+  mutate(DateTime = paste0(Date, ' ', Heure)) %>%
+  # Get the Target date in the right format for corresponding with the stratif
+  # dataset
+  mutate(Target_Date = ymd_hms(DateTime)) %>%
+  # And get the Date variable in the right format
+  mutate(Date = ymd(Date))
+
+# Same number of events as the Dinophysis tibble: seems ok
+
+## Part 3: Pigment data ####
+# We want to get the HPLC pigment data to look at the alloxanthin
+
+Table_pigments <- read.csv2('Table_pigments_2007-2022.csv', header = TRUE, 
+                         fileEncoding = 'ISO-8859-1')
+
+# Only keep the 4 sites we will use for our second RF model
+Table_pigments_select <- filter(Table_pigments, Code_point_Libelle %in% 
+                                c(# Baie de Seine
+                                  'Antifer ponton pétrolier', 'Cabourg',
+                                  # Bretagne Sud
+                                  'Men er Roue', 'Ouest Loscolo')) %>%
+  # And get the Date variable in the right format
+  mutate(Date = ymd(Date))
+
+# This dataset is a bit different from the others.
+
+## Part 4: gam derivative data ####
 
 # We import the dataframe of the derivative of the GAM.
 # From the script Deriv_GAMs_DinoPhenology...
@@ -69,7 +118,7 @@ gam_Dino.d_multiyear <- read.csv2('gam_Dino_multiyear_deriv_20241203.csv',
   # Put Date in date format
   mutate(Date = ymd(Date))
 
-## Part 3: environmental data ####
+## Part 5: environmental data ####
 ### Hydrological parameters form the REPHY dataset
 Table_hydro <- read.csv2('Table1_hydro_select.csv', header = TRUE, 
                          fileEncoding = "ISO-8859-1")
@@ -113,9 +162,9 @@ isNA_SALI <- filter(Table_hydro_select, is.na(SALI) == TRUE)
 isNA_CHLOROA <- filter(Table_hydro_select, is.na(CHLOROA) == TRUE)
 # Not clean. 733 obs with CHLOROA = NA, from 2007 to 2022, in several sites
 
-## Part 4 - Model data ####
+## Part 6: Model data ####
 
-### Stratification index from the GAMAR model
+### Stratification index from the GAMAR model ##
 Table_stratif <- read.csv2('Stratif_index_GAMAR_12sites.csv',
                            header = TRUE, fileEncoding = 'ISO-8859-1') %>%
   # Getting it in date format
@@ -125,7 +174,7 @@ Table_stratif <- read.csv2('Stratif_index_GAMAR_12sites.csv',
 # DATES ON ALL SITES
 # By joining our files and ditching what's superfluous, we should manage
 
-### Atmospheric data from the ERA5 model ####
+### Atmospheric data from the ERA5 model ##
 
 # These data are in 3 period formats (daily, weekly, fortnightly) and in 2 stats
 # format (median over the period or mean over the period)
@@ -164,14 +213,6 @@ Table_data_RF <- left_join(Season_Dino_12sites, Table_stratif,
 
 # It works. It just works.
 
-## Second, the ERA5 data (only fortnight mean for now)
-# events are associated by fortnight and year (and sampling site of course)
-Table_data_RF <- left_join(Table_data_RF, Table_era5_fortnight_mean, 
-                           by = c('Year', 'Fortnight', 'Code_point_Libelle'),
-                           suffix = c('',''))
-
-# Good.
-
 # Now let's join the hydrology table
 
 Table_data_RF <- left_join(Table_data_RF, Table_hydro_select, 
@@ -179,6 +220,14 @@ Table_data_RF <- left_join(Table_data_RF, Table_hydro_select,
                            suffix = c('',''))
 
 # Fantastic
+
+## Third, the ERA5 data (only fortnight mean for now)
+# events are associated by fortnight and year (and sampling site of course)
+Table_data_RF <- left_join(Table_data_RF, Table_era5_fortnight_mean, 
+                           by = c('Year', 'Fortnight', 'Code_point_Libelle'),
+                           suffix = c('',''))
+
+# Good.
 
 # And now the tricky part: we project the derivative on every date based on the
 # calendar day.
@@ -212,7 +261,7 @@ ggplot(Table_data_RF_multiyear) +
 # probably has to do with FNU to NTU conversion that was not done in the data
 # curating scripts. We should correct that later.
 
-#### Applying the random forest model ####
+#### First random forest model: 10 sites with fewer parameters ####
 
 ### Preparing model data ####
 
@@ -453,6 +502,397 @@ write.csv2(dataplot_vip, 'Randomforest_vip_data_20250317.csv',
 ## Variable importance plot ####
 
 # If necessary, import data previosuly saved
+dataplot_vip_import <- read.csv2('Randomforest_vip_data_20250317.csv', header = TRUE,
+                          fileEncoding = 'ISO-8859-1')
+
+# We pivot longer the values of variable importance to get tidy data
+
+dataplot_vip_tidy <- pivot_longer(dataplot_vip_import, cols = -c('Variable'), 
+                                  names_to ='Seed') %>%
+  group_by(Variable)
+
+# To make a nice plot, we need to order the variables by order of importance
+# So we calculate the median for each
+dataplot_vip_median <- dataplot_vip_tidy %>%
+  summarise(value.median = median(value),
+            value.sd = sd(value), .groups = 'keep') %>%
+  arrange(desc(value.median))
+
+# Nice. Now reorder the factor
+dataplot_vip_tidy <- dataplot_vip_tidy %>%
+  mutate(Variable = as_factor(Variable)) %>%
+  # relevel the factor in descending order of variable importance
+  mutate(Variable = fct_relevel(Variable, 'ssr', 'TEMP', 'Code_point_Libelle',
+                                'tcc', 'v10', 'SALI', 'X14.Day_Average_SI', 
+                                'CHLOROA', 'u10'))
+
+# Color palette
+palette_bretagne9 <- c('#FBA823', 'red3', '#8D6456', '#B47E24', '#FBB665',
+                        '#11203E', '#377185', '#1F3700', '#FBB646')
+
+# Plot
+ggplot(data = dataplot_vip_tidy, aes(x = Variable, y = value, color = Variable)) +
+  # A dot plot of medians
+  geom_point(data = dataplot_vip_median,
+             aes(x = Variable, y = value.median, color = Variable),
+             size = 4.5) +
+  # With a dot plot of all simulations as overlay
+  geom_point(position = position_jitter(width = .1),
+             alpha = .4, size = 1.5) +
+  # Custom label for y axis
+  labs(x = NULL, y = 'Variable importance') +
+  # Flip x and y axes
+  coord_flip() +
+  # Reverse x axis so most important variable appears at the top
+  scale_x_discrete(limits = rev) +
+  # Color palette
+  scale_color_discrete(type = palette_bretagne9, guide = 'none') +
+  theme_classic()
+
+# Save the plot
+# ggsave('VIP_RandomForest_10sites_20250318.tiff', width = 164, height = 130, units = 'mm',
+#        compression = 'lzw', dpi = 300)
+
+# According to Dr. Bede Davies, it's better to represent it as mean +-std error
+# So we'll do just that and calculate the mean for each
+dataplot_vip_mean <- dataplot_vip_tidy %>%
+  summarise(value.mean = mean(value), .groups = 'keep') %>%
+  arrange(desc(value.mean))
+
+# Same order as the median, that's convenient.
+# Calculate the standard deviation
+dataplot_vip_sd <- dataplot_vip_tidy %>%
+  summarise(value.sd = sd(value), .groups = 'keep')
+
+# Group the 2 dataframes
+dataplot_vip_stats <- left_join(dataplot_vip_mean, dataplot_vip_sd, 
+                                by = c('Variable'))
+
+# Plot with mean +- sd
+ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean, 
+                                      fill = Variable)) +
+  # all data points for 20 model runs
+  geom_point(data = dataplot_vip_tidy, aes(x = Variable, y = value, 
+                                           color = Variable),
+             position = position_jitter(width = .1),
+             alpha = .4, size = 1.5) +
+  
+  # error bars
+  geom_errorbar(aes(x = Variable, ymin = value.mean - value.sd,
+                    ymax = value.mean + value.sd), linewidth = .5,
+                color = 'grey10', width = .2) +
+  
+  # points for means
+  geom_point(size = 4, color = 'grey10',
+             shape = 21, stroke = .5) +
+  
+  # Color scales
+  scale_fill_discrete(type = palette_bretagne9, guide = 'none') +
+  scale_color_discrete(type = palette_bretagne9, guide = 'none') +
+  # Custom label for y axis
+  labs(x = NULL, y = 'Variable importance') +
+  # Flip x and y axes
+  coord_flip() +
+  # Reverse x axis so most important variable appears at the top
+  scale_x_discrete(limits = rev) +
+  theme_classic()
+
+# Save the plot
+ggsave('VIP_RandomForest_meansd_20250318.tiff', width = 100, height = 120, units = 'mm',
+       compression = 'lzw', dpi = 300)
+
+#### Second random forest model: 4 sites with more parameters ####
+
+### Preparing model data ####
+
+### Data for the second random forest model (4 sites) ###
+
+Table_data_RF2 <- left_join(Table_data_RF_multiyear, Season_Meso_12sites,
+                            by = c('Code_point_Libelle', 'ID.interne.passage'), 
+                            suffix = c('',''))%>%
+  # Keep only the 4 sites for which we are confident in Mesodinium data AND we
+  # have pigment data
+  filter(Code_point_Libelle %in% 
+           c(# Baie de Seine
+             'Antifer ponton pétrolier', 'Cabourg',
+             # Bretagne Sud
+             'Men er Roue', 'Ouest Loscolo')) %>%
+  # Only years from 2016 onwards (first HPLC pigment data)
+  filter(Year >= 2016) %>%
+  # Keep only events with reliable values of nutrients (no NA)
+  filter(is.na(NH4) == FALSE &
+           is.na(PO4) == FALSE &
+           is.na(SIOH) == FALSE &
+           is.na(OXYGENE) == FALSE &
+           is.na(NO3.NO2) == FALSE)
+
+# 584 events remaining. Matching pigments now: this is more of a quality check,
+# as HPLC pigments values were included in the hydrology table.
+
+Table_data_RF2 <- left_join(Table_data_RF2, Table_pigments_select,
+                            by = c('Code_point_Libelle', 'ID.interne.passage'),
+                            suffix = c('','')) %>%
+  # Removing any NAs for alloxanthin
+  filter(is.na(Allo) == FALSE) %>%
+  # Relevel the sampling site as a factor
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle, 
+                                          'Antifer ponton pétrolier', 'Cabourg', 
+                                          'Men er Roue', 'Ouest Loscolo'))
+
+# Some NAs removed: we only have 469 events in the table now.
+
+# color palette
+palette_4sites <- c(# Baie de Seine
+  'red3', 'orangered',
+  # Men er Roue, Ouest Loscolo
+  '#2156A1', '#5995E3')
+
+
+# How much events we have in each site?
+ggplot(Table_data_RF2) +
+  geom_histogram(aes(x = Code_point_Libelle, fill = Code_point_Libelle),
+                 stat = 'count') +
+  scale_fill_discrete(type = palette_4sites) +
+  theme_classic()
+# We have approx. 1/3 more events in South Brittany compared with Seine Bay.
+# Not ideal but eh.
+
+# Let's draw time series of alloxanthin to check if what we have is sufficiently
+# continuous
+
+ggplot(Table_data_RF2)+
+  geom_point(aes(x=Date, y=Allo, color = Code_point_Libelle), 
+             alpha = .7) +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  scale_color_discrete(type = palette_4sites, guide = 'none') +
+  theme_classic() +
+  labs(y="Alloxanthin (µg/L)", x="Date")
+
+# We indeed have a hole in the series in Seine Bay.
+
+# For the data table that we will use for the random forest, we only keep the
+# response variable (.derivative) and the predictor variables (TEMP, SALI,
+# CHLOROA, X.14.Day_Average_SI, ssr, tcc, u10, v10). Let's also try to keep
+# Code_point_Libelle to see if unmonitored local factors play a big role
+
+RF_data <- Table_data_RF2 %>%
+  select(.derivative, TEMP, SALI, CHLOROA, X14.Day_Average_SI, 
+         ssr, tcc, u10, v10, Code_point_Libelle, Mesodinium_genus, Allo,
+         NH4, PO4, SIOH, OXYGENE, NO3.NO2) %>%
+  # We drop any NA value in these variables (should be done already)
+  drop_na()
+
+# Same number of events (469)
+
+### We will split the dataset to have a training and a validation set
+splitdata_RF <- initial_split(RF_data)
+
+RF_train <- splitdata_RF %>%
+  training()
+
+RF_test <- splitdata_RF %>%
+  testing()
+
+# We set a seed to ensure that we get consistent results each time 
+# the code is run (because the split is randomly different each time)
+set.seed(234)
+
+# 'strata = .derivative' allows us to ensure that different levels of the 
+# response variable (the derivative in our case) are present in each fold 
+RF_train_folds <- vfold_cv(RF_train, strata = .derivative)
+
+RF_train_folds
+
+# This seems ok
+
+# We tell the recipe of the model (predict '.derivative' based on everything else,
+# and we DON'T convert our categorical variable ('Code_point_Libelle') into a dummy 
+# variable
+RF_recipe <- recipe(.derivative ~ ., data = RF_train) # %>%
+# step_dummy(Code_point_Libelle)
+
+# We create a 'juiced' dataset with the recipe applied to it, for later on
+RF_juiced <- prep(RF_recipe) %>%
+  juice()
+
+# OK, next
+
+
+### Model building ####
+
+# We create a model object that we can tune
+tune_spec <- rand_forest(
+  mtry = tune(),
+  # number of trees
+  trees = 500,
+  min_n = tune()) %>%
+  # We set the mode as regression as we want to predict a continuous variable
+  set_mode('regression') %>%
+  set_engine('ranger')
+
+# Create a workflow in which we put the recipe and the model
+tune_wf <- workflow() %>%
+  add_recipe(RF_recipe) %>%
+  add_model(tune_spec)
+
+# We set the same seed as defined before
+set.seed(234)
+
+# This step takes some time
+tune_res <- tune_grid(
+  tune_wf,
+  resamples = RF_train_folds,
+  grid = 10)
+
+# Plotting the results of each fold using the RMSE
+tune_res %>%
+  collect_metrics() %>%
+  filter(.metric == 'rmse') %>%
+  select(mean, min_n, mtry) %>%
+  pivot_longer(min_n:mtry,
+               values_to = 'value',
+               names_to = 'parameter') %>%
+  ggplot(aes(x = value, y = mean, color = parameter)) +
+  geom_point(show.legend = FALSE) +
+  facet_wrap(~parameter, scales = 'free_x') +
+  labs(x = NULL, y = 'RMSE') +
+  theme_classic()
+
+# Use a function to select the best hyper parameters (min_n and mtry) for our
+# model
+best_rmse <- select_best(tune_res, metric = 'rmse')
+
+# Final random forest
+final_RF <- finalize_model(
+  tune_spec,
+  best_rmse)
+
+final_RF
+
+### Investigating the most important features of the model ####
+
+# keep the same seed
+set.seed(234)
+
+final_RF %>%
+  set_engine('ranger', importance = 'permutation') %>%
+  fit(.derivative~., data = RF_juiced) %>%
+  vip(geom = 'point') +
+  theme_classic()
+
+# We got a nice plot of variable importance!
+# But we want one that integrates the random nature of the model
+# (i.e., we want error bars)
+
+# The idea here is to run the model 20 times on 20 different seeds, 
+# and to collect the variable importance data each time, so we can plot them 
+# at the end.
+
+# The for loop will include exactly the same code as before, the only thing that 
+# will change every time is the seed
+
+# We also need to create a dataframe to store the results
+
+# Get the variables from the model
+vip_info <- final_RF %>%
+  set_engine('ranger', importance = 'permutation') %>%
+  fit(.derivative~., data = RF_juiced)
+
+# Convert it as tibble to get a vector of names
+vip_tibble <- as_tibble(vip_info$fit$variable.importance, rownames = 'Variable')
+
+dataplot_vip <- as_tibble_col(vip_tibble$Variable, column_name = 'Variable')
+# Nice!
+rm(vip_info)
+rm(vip_tibble)
+
+# A big ugly for loop to run 20 iterations of the model
+# (this step takes some time, obviously)
+
+for (i in 1:20) {
+  set.seed(i)
+  
+  # 'strata = .derivative' allows us to ensure that different levels of the 
+  # response variable (the derivative in our case) are present in each fold 
+  RF_train_folds <- vfold_cv(RF_train, strata = .derivative)
+  
+  RF_train_folds
+  
+  # This seems ok
+  
+  # We tell the recipe of the model (predict '.derivative' based on everything else,
+  # and we DON'T convert our categorical variable ('Code_point_Libelle') into a dummy 
+  # variable
+  RF_recipe <- recipe(.derivative ~ ., data = RF_train) # %>%
+  #   step_dummy(Code_point_Libelle)
+  
+  # We create a 'juiced' dataset with the recipe applied to it, for later on
+  RF_juiced <- prep(RF_recipe) %>%
+    juice()
+  
+  # OK, next
+  
+  # We create a model object that we can tune
+  tune_spec <- rand_forest(
+    mtry = tune(),
+    # number of trees
+    trees = 500,
+    min_n = tune()) %>%
+    # We set the mode as regression as we want to predict a continuous variable
+    set_mode('regression') %>%
+    set_engine('ranger')
+  
+  # Create a workflow in which we put the recipe and the model
+  tune_wf <- workflow() %>%
+    add_recipe(RF_recipe) %>%
+    add_model(tune_spec)
+  
+  # We set the same seed as defined before
+  set.seed(i)
+  
+  # This step takes some time
+  tune_res <- tune_grid(
+    tune_wf,
+    resamples = RF_train_folds,
+    grid = 10)
+  
+  # Use a function to select the best hyper parameters (min_n and mtry) for our
+  # model
+  best_rmse <- select_best(tune_res, metric = 'rmse')
+  
+  # Final random forest
+  final_RF <- finalize_model(
+    tune_spec,
+    best_rmse)
+  
+  # Re-run the model on same seed and store the info in a "passerelle" object
+  set.seed(i)
+  
+  passerelle_RF <- final_RF %>%
+    set_engine('ranger', importance = 'permutation') %>%
+    fit(.derivative~., data = RF_juiced)
+  
+  # Append the variable importance at the end of the tibble we constructed 
+  # before
+  # 1st, build a tibble with the var importance and the variables
+  added_tibble <- as_tibble(passerelle_RF$fit$variable.importance, 
+                            rownames = 'Variable')
+  # 2nd, left_join with our existing dataframe by 'Variable' with appropriate
+  # suffix
+  dataplot_vip <- left_join(x = dataplot_vip, y = added_tibble, 
+                            by = c('Variable'), 
+                            suffix = c('',as.character(i)))
+  
+}
+
+# Save the result!
+# write.csv2(dataplot_vip, 'Randomforest2_vip_data_20250318.csv', 
+#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
+
+## Variable importance plot ####
+
+# If necessary, import data previously saved
 # dataplot_vip_import <- read.csv2('Randomforest_vip_data_20241203.csv', header = TRUE,
 #                           fileEncoding = 'ISO-8859-1')
 
@@ -473,13 +913,17 @@ dataplot_vip_median <- dataplot_vip_tidy %>%
 dataplot_vip_tidy <- dataplot_vip_tidy %>%
   mutate(Variable = as_factor(Variable)) %>%
   # relevel the factor in descending order of variable importance
-  mutate(Variable = fct_relevel(Variable, 'ssr', 'TEMP', 'Code_point_Libelle',
-                                'tcc', 'v10', 'SALI', 'X14.Day_Average_SI', 
-                                'CHLOROA', 'u10'))
+  mutate(Variable = fct_relevel(Variable, 'NH4', 'ssr', 'SIOH', 'TEMP', 'PO4', 
+                                'NO3.NO2', 'Allo', 'u10', 'Code_point_Libelle',
+                                'OXYGENE', 'tcc', 'CHLOROA', 'SALI',
+                                'X14.Day_Average_SI', 'v10', 'Mesodinium_genus'  
+                                ))
 
 # Color palette
-palette_bretagne10 <- c('#435E7B', '#11203E', '#09050B', '#791D40',
-                       '#649003', '#757AC9', 'red', 'blue', 'cyan', 'orange')
+palette_bretagne16 <- c('#FF6448', '#FBA823', '#DEB1CC', 'red3', '#8B064B',
+                        '#FC4D6B', '#9DA51E', '#FBB646', '#8D6456', '#2A56A1',
+                        '#B47E24', '#1F3700', '#11203E', '#377185', '#FBB665',
+                        '#711412')
 
 # Plot
 ggplot(data = dataplot_vip_tidy, aes(x = Variable, y = value, color = Variable)) +
@@ -497,12 +941,12 @@ ggplot(data = dataplot_vip_tidy, aes(x = Variable, y = value, color = Variable))
   # Reverse x axis so most important variable appears at the top
   scale_x_discrete(limits = rev) +
   # Color palette
-  scale_color_discrete(type = palette_bretagne10, guide = 'none') +
+  scale_color_discrete(type = palette_bretagne16, guide = 'none') +
   theme_classic()
 
 # Save the plot
-# ggsave('VIP_RandomForest_10sites_20250317.tiff', width = 225, height = 170, units = 'mm',
-#        compression = 'lzw', dpi = 300)
+ggsave('VIP_RandomForest2_4sites_20250318.tiff', width = 164, height = 250, units = 'mm',
+       compression = 'lzw', dpi = 300)
 
 # According to Dr. Bede Davies, it's better to represent it as mean +-std error
 # So we'll do just that and calculate the mean for each
@@ -510,24 +954,45 @@ dataplot_vip_mean <- dataplot_vip_tidy %>%
   summarise(value.mean = mean(value), .groups = 'keep') %>%
   arrange(desc(value.mean))
 
-# Same order as the median, that's convenient.
-# Calculate the standard error
-dataplot_vip_se <- dataplot_vip_tidy %>%
-  summarise(value.se = MeanSE(value), .groups = 'keep')
+# Almost same order as the median, that's convenient.
+# Calculate the standard deviation
+dataplot_vip_sd <- dataplot_vip_tidy %>%
+  summarise(value.sd = sd(value), .groups = 'keep')
 
 # Group the 2 dataframes
-dataplot_vip_stats <- left_join(dataplot_vip_mean, dataplot_vip_se, 
-                                by = c('Variable'))
+dataplot_vip_stats <- left_join(dataplot_vip_mean, dataplot_vip_sd, 
+                                by = c('Variable')) %>%
+  # Relevel the factor to get the variables in the right order
+  mutate(Variable = as_factor(Variable)) %>%
+  # relevel the factor in descending order of variable importance
+  mutate(Variable = fct_relevel(Variable, 'NH4', 'ssr', 'SIOH', 'TEMP', 'PO4', 
+                                'NO3.NO2', 'Allo', 'u10', 'tcc', 'OXYGENE',
+                                'Code_point_Libelle', 'CHLOROA', 'SALI',
+                                'X14.Day_Average_SI', 'v10', 'Mesodinium_genus'  
+  ))
+  
 
-# Plot with mean +- se
-ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean)) +
-  # points for means
-  geom_point(size = 5, fill = '#BBD4F2', color = '#435E7B',
-             shape = 21, stroke = .8) +
+# Plot with mean +- sd
+ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean, 
+                                      fill = Variable)) +
+  # all data points for 20 model runs
+  geom_point(data = dataplot_vip_tidy, aes(x = Variable, y = value, 
+                                           color = Variable),
+             position = position_jitter(width = .1),
+             alpha = .4, size = 1.5) +
+  
   # error bars
-  geom_errorbar(aes(x = Variable, ymin = value.mean - value.se,
-                    ymax = value.mean + value.se), linewidth = .8,
-                color = 'grey10', width = .4) +
+  geom_errorbar(aes(x = Variable, ymin = value.mean - value.sd,
+                    ymax = value.mean + value.sd), linewidth = .5,
+                color = 'grey10', width = .2) +
+  
+  # points for means
+  geom_point(size = 4, color = 'grey10',
+             shape = 21, stroke = .5) +
+  
+  # Color scales
+  scale_fill_discrete(type = palette_bretagne16, guide = 'none') +
+  scale_color_discrete(type = palette_bretagne16, guide = 'none') +
   # Custom label for y axis
   labs(x = NULL, y = 'Variable importance') +
   # Flip x and y axes
@@ -537,5 +1002,5 @@ ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean)) +
   theme_classic()
 
 # Save the plot
-# ggsave('VIP_RandomForest_meanse_20241014.tiff', width = 225, height = 170, units = 'mm',
-#        compression = 'lzw', dpi = 300)
+ggsave('VIP_RandomForest2_meansd_20250318.tiff', width = 164, height = 180, units = 'mm',
+       compression = 'lzw', dpi = 300)
