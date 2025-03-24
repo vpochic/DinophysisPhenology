@@ -8,6 +8,7 @@
 #### Packages and functions ####
 library(tidyverse)
 library(ggplot2)
+library(ggnewscale)
 library(cmocean)
 library(RColorBrewer)
 
@@ -169,6 +170,13 @@ Maxima_Dino_2 <- Season_Dino_nozeros %>%
                                           'Parc Leucate 2', 'Bouzigues (a)',
                                           'Sète mer', 'Diana centre'))
 
+# Getting some stats for this second thing
+Maxima_Dino_2_stats <- Maxima_Dino_2 %>%
+  group_by(Code_point_Libelle, period) %>%
+  summarise(median_daymax = median(Day), mean_daymax = mean(Day), 
+            stdev_daymax = sd(Day), min_daymax = min(Day), max_daymax = max(Day),
+            .groups = 'keep')
+
 # Let's plot it again
 
 ggplot(Maxima_Dino_2, aes(x = Year, y = Day, color = Code_point_Libelle)) +
@@ -207,13 +215,13 @@ Table_hydro_daily_select <- filter(Table_hydro_daily,
                                        'Men er Roue', 'Ouest Loscolo',
                                        'Le Cornard', 'Auger',
                                        'Arcachon - Bouée 7', 'Teychan bis'))
-Maxima_Dino_stats_select <- filter(Maxima_Dino_stats,
+Maxima_Dino_2_stats_select <- filter(Maxima_Dino_2_stats,
                                    Code_point_Libelle %in%
                                      c('Antifer ponton pétrolier', 'Cabourg',
                                        'Men er Roue', 'Ouest Loscolo',
                                        'Le Cornard', 'Auger',
                                        'Arcachon - Bouée 7', 'Teychan bis'))
-Maxima_Dino_select <- filter(Maxima_Dino,
+Maxima_Dino_select <- filter(Maxima_Dino_2,
                              Code_point_Libelle %in%
                                c('Antifer ponton pétrolier', 'Cabourg',
                                  'Men er Roue', 'Ouest Loscolo',
@@ -225,39 +233,83 @@ pheno_palette8 <- c('red3', 'orangered', '#2156A1', '#5995E3',
                     '#1F3700', '#649003','#F7B41D', '#FBB646')
 
 # First, let's plot the distribution of the maxima (without the heatmap)
-ggplot(Maxima_Dino_stats_select, aes(color = Code_point_Libelle)) +
-  # All observations as small translucid points
+ggplot(Maxima_Dino_2_stats_select, aes(color = Code_point_Libelle)) +
+  
+  # All maxima as smaller translucid points
   geom_point(data = Maxima_Dino_select, aes(x = Day, y = Code_point_Libelle, 
                                             color = Code_point_Libelle), 
-             size = 3, alpha = .5) +
+             size = 2.5, alpha = .5) +
+  
+  ## Mean +- sd of maxima (by site and by period)
+  # error bars
+  geom_errorbar(aes(y = Code_point_Libelle, xmin = mean_daymax - stdev_daymax,
+                    xmax = mean_daymax + stdev_daymax), linewidth = .5,
+                color = 'grey10', width = .2) +
+  
+  # points for means
+  geom_point(aes(y = Code_point_Libelle, x = mean_daymax, 
+                 fill = Code_point_Libelle), size = 4, color = 'grey10',
+             shape = 21, stroke = .5) +
+  
+  # Color scales
   scale_color_discrete(type = pheno_palette8, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette8, guide = 'none') +
+  
+  ## Axis stuff
   scale_x_continuous(limits = c(1,365), breaks = c(1, 100, 200, 300, 365)) +
   # reverse y axis to get sites in the desired order
   scale_y_discrete(limits = rev) +
+  
+  # labels
   labs(x = 'Day of the year', y = NULL) +
   theme_classic()
 
 # Now we try to underlie a heatmap of temperature/chl a seasonality 
 # (2 versions of the plot)
-ggplot(Maxima_Dino_stats_select) +
+ggplot(Maxima_Dino_2_stats_select) +
   geom_tile(data = Table_hydro_daily_select, 
             aes(x = Day, y = Code_point_Libelle, fill = TEMP.med), #fill = CHLOROA.med
             alpha = .8) +
   # color palette for fill
-  # All observations as small translucid points
-  geom_point(data = Maxima_Dino_select, aes(x = Day, y = Code_point_Libelle, 
-                                            color = Code_point_Libelle), 
-             size = 3, alpha = .5) +
-  scale_color_discrete(type = pheno_palette8, guide = 'none') +
-  scale_x_continuous(limits = c(1,365), breaks = c(1, 100, 200, 300, 365)) +
-  # reverse y axis to get sites in the desired order
-  scale_y_discrete(limits = rev) +
   # Temperature version
   scale_fill_distiller(palette = 'RdBu', direction = -1) +
   # Chl a version
   # scale_fill_cmocean(name = 'algae') +
+  
+  # Add labels here so the name of the 'fill' legend is correct
   # Labels (for chl a plot fill = 'Median [chl a] (mg/m3)')
-  labs(x = 'Day of the year', y = NULL, fill = 'Median SST (°C)') +
+  labs(x = 'Day of the year', y = NULL, fill = 'Median SST (°C)',
+       title = 'Maxima of Dinophysis counts (2007-2022)') +
+  
+  # New fill scale for points
+  new_scale_fill() +
+  
+  # All maxima as smaller translucid points
+  geom_point(data = Maxima_Dino_select, aes(x = Day, y = Code_point_Libelle, 
+                                            color = Code_point_Libelle), 
+             size = 2.5, alpha = .5) +
+  
+  ## Mean +- sd of maxima (by site and by period)
+  # error bars
+  geom_errorbar(aes(y = Code_point_Libelle, xmin = mean_daymax - stdev_daymax,
+                    xmax = mean_daymax + stdev_daymax), linewidth = .5,
+                color = 'grey10', width = .2) +
+  
+  # points for means
+  geom_point(aes(y = Code_point_Libelle, x = mean_daymax, 
+                 fill = Code_point_Libelle), size = 4, color = 'grey10',
+             shape = 21, stroke = .5) +
+  
+  # Color scales
+  scale_color_discrete(type = pheno_palette8, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette8, guide = 'none') +
+  
+  # Axis stuff
+  # reverse y axis to get sites in the desired order
+  scale_y_discrete(limits = rev) +
+  scale_x_continuous(limits = c(1,365), breaks = c(1, 100, 200, 300, 365)) +
+  
+  # Theme
   theme(plot.title = element_text(size = 11), 
         # Axis
         axis.title.x = element_text(size=10), 
