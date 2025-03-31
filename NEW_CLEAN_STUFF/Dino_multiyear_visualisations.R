@@ -1,6 +1,6 @@
 ###### Dinophysis phenology: visualisations on multiple years ###
 ## V. POCHIC
-# 2025-03-24
+# 2025-03-31
 
 # Additional visualisations using the results of GAM, REPHY data and satellite
 # observations, to observe Dinophysis dynamics over several years
@@ -56,13 +56,20 @@ Maxima_Dino_stats <- Maxima_Dino %>%
   group_by(Code_point_Libelle) %>%
   summarise(median_daymax = median(Day), mean_daymax = mean(Day), 
             stdev_daymax = sd(Day), min_daymax = min(Day), max_daymax = max(Day),
-            .groups = 'keep') 
+            median.lat = median(Latitude),
+            .groups = 'keep')
 
-# Color palette
+
+
+# Color palettes
 pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered', 
                      '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
                      '#1F3700', '#649003','#F7B41D', '#FBB646',
                      '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
+
+# For the sites with regular Dinophysis blooms only
+pheno_palette8 <- c('red3', 'orangered', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646')
 
 ggplot(Maxima_Dino, aes(x = Year, y = Day, color = Code_point_Libelle)) +
   # add linear regression fit before the points
@@ -99,6 +106,15 @@ GAM_pit <- Dino_response_pred %>%
   # (lag) and following (lead) value
   filter(lag(fit) > fit & lead(fit) > fit)
 
+# Here we do the opposite: we're looking for the peaks
+GAM_peak <- Dino_response_pred %>%
+  # Group by site and Year
+  group_by(Code_point_Libelle, Year) %>%
+  # Filter rows for which the value of fit is inferior to both the previous
+  # (lag) and following (lead) value
+  filter(lag(fit) < fit & lead(fit) < fit)
+
+# Cleaning up
 GAM_pit_select <- filter(GAM_pit, Code_point_Libelle %in% 
                          c('Men er Roue', 'Ouest Loscolo',
                          'Le Cornard', 'Auger',
@@ -114,8 +130,23 @@ GAM_pit_select <- filter(GAM_pit, Code_point_Libelle %in%
                                           'Le Cornard', 'Auger',
                                           'Arcachon - Bouée 7', 'Teychan bis'))
 
+GAM_peak_select <- filter(GAM_peak, Code_point_Libelle %in% 
+                           c('Antifer ponton pétrolier', 'Cabourg',
+                             'Men er Roue', 'Ouest Loscolo',
+                             'Le Cornard', 'Auger',
+                             'Arcachon - Bouée 7', 'Teychan bis')) %>%
+  
+  # Reorder the site as a factor
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis'))
+
 # Next step: split the maxima in 2 periods (before and after the pit)
 
+# True data
 Maxima_Dino_2 <- Season_Dino_nozeros %>%
   # group
   group_by(Code_point_Libelle, Year) %>%
@@ -170,31 +201,93 @@ Maxima_Dino_2 <- Season_Dino_nozeros %>%
                                           'Parc Leucate 2', 'Bouzigues (a)',
                                           'Sète mer', 'Diana centre'))
 
+# GAM fit
+GAM_peak_select2 <- GAM_peak_select %>%
+  # group
+  group_by(Code_point_Libelle) %>%
+  # We'll need to create a period variable (1/2) for each site, based on the
+  # pits of the GAM
+  # This piece of code is not pretty but it works
+  mutate(period = 
+           #Men er Roue
+           ifelse(Code_point_Libelle == 'Men er Roue' & Day <= 223,
+                  1,
+                  ifelse(Code_point_Libelle == 'Men er Roue',
+                         2,
+                         # Ouest Loscolo
+                         ifelse(Code_point_Libelle == 'Ouest Loscolo' & Day <= 232,
+                                1,
+                                ifelse(Code_point_Libelle == 'Ouest Loscolo',
+                                       2,
+                                       # Le Cornard
+                                       ifelse(Code_point_Libelle == 'Le Cornard' & Day <= 210,
+                                              1,
+                                              ifelse(Code_point_Libelle == 'Le Cornard',
+                                                     2,
+                                                     # Auger
+                                                     ifelse(Code_point_Libelle == 'Auger' & Day <= 209,
+                                                            1,
+                                                            ifelse(Code_point_Libelle == 'Auger',
+                                                                   2,
+                                                                   # Arcachon Bouée 7
+                                                                   ifelse(Code_point_Libelle == 'Arcachon - Bouée 7' & Day <= 195,
+                                                                          1,
+                                                                          ifelse(Code_point_Libelle == 'Arcachon - Bouée 7',
+                                                                                 2,
+                                                                                 # Teychan bis
+                                                                                 ifelse(Code_point_Libelle == 'Teychan bis' & Day <= 201,
+                                                                                        1,
+                                                                                        ifelse(Code_point_Libelle == 'Teychan bis',
+                                                                                               2,
+                                                                                               # All other sites
+                                                                                               1))))))))))))) %>%
+  # Add period as a grouping variable
+  group_by(Code_point_Libelle, Year, period) %>%
+  # Code_point_Libelle as factor
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis'))
+
 # Getting some stats for this second thing
 Maxima_Dino_2_stats <- Maxima_Dino_2 %>%
   group_by(Code_point_Libelle, period) %>%
   summarise(median_daymax = median(Day), mean_daymax = mean(Day), 
             stdev_daymax = sd(Day), min_daymax = min(Day), max_daymax = max(Day),
+            median.lat = median(Latitude),
             .groups = 'keep')
 
 # Let's plot it again
 
-ggplot(Maxima_Dino_2, aes(x = Year, y = Day, color = Code_point_Libelle)) +
+ggplot(data = subset(Maxima_Dino_2,
+                     Code_point_Libelle %in% 
+                       c('Antifer ponton pétrolier', 'Cabourg',
+                         'Men er Roue', 'Ouest Loscolo',
+                         'Le Cornard', 'Auger',
+                         'Arcachon - Bouée 7', 'Teychan bis')), 
+       aes(x = Year, y = Day, color = Code_point_Libelle, 
+           shape = as.factor(period))) +
   # add linear regression fit before the points
   geom_smooth(method = 'lm', alpha = .3) +
   # then the points
   geom_point(size = 4, alpha = .8) +
   # aesthetics
-  facet_wrap(facets = 'Code_point_Libelle') +
-  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  facet_wrap(facets = 'Code_point_Libelle', nrow = 2) +
+  scale_color_discrete(type = pheno_palette8, guide = 'none') +
   scale_y_continuous(limits = c(1, 365), 
                      breaks = c(1, 100, 200, 300, 365)) +
+  scale_shape_discrete(guide = 'none') +
+  # scale_shape_manual(values = c(1, 3), guide = 'none') +
+  # labels
   labs(y = 'Day of maximum Dinophysis count') +
   theme_classic()
 
 # That's even doper
-# ggsave('Maxima_plot2_16sites.tiff', dpi = 300, height = 175, width = 250,
+# ggsave('Maxima_plot2_8sites.tiff', dpi = 300, height = 125, width = 164,
 #                units = 'mm', compression = 'lzw')
+
 
 ### Environmental data ####
 
@@ -336,6 +429,107 @@ ggplot(Maxima_Dino_2_stats_select) +
 # ggsave('Dino_max_temp.tiff', dpi = 300, height = 180, width = 150,
 #        units = 'mm', compression = 'lzw')
 
+### Plotting maxima by latitude ####
+
+ggplot() +
+  
+  # All maxima as smaller translucid points
+  geom_point(data = Maxima_Dino_select, aes(x = Day, y = Latitude, 
+                                            fill = Code_point_Libelle,
+                                            shape = as.factor(period),
+                                            alpha = log10(true_count)),
+             stroke = 0, color = 'transparent',
+             size = 2.5) +
+  
+  ## Mean +- sd of maxima (by site and by period)
+  # error bars
+  geom_errorbar(data = Maxima_Dino_2_stats_select,
+                aes(y = median.lat, xmin = mean_daymax - stdev_daymax,
+                    xmax = mean_daymax + stdev_daymax),
+                linewidth = .5,
+                color = 'grey10', width = .1) +
+  
+  # points for means
+  geom_point(data = Maxima_Dino_2_stats_select,
+             aes(y = median.lat, x = mean_daymax, 
+                 fill = Code_point_Libelle, shape = as.factor(period)),
+             size = 4, color = 'grey10', stroke = .5) +
+  
+  # Color scales
+  scale_color_discrete(type = pheno_palette8, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette8, guide = 'none') +
+  # Shape
+  scale_shape_manual(values = c(21, 24), guide = 'none') +
+  # Transparency
+  scale_alpha_continuous(guide = 'none') +
+  
+  ## Axis stuff
+  scale_x_continuous(limits = c(1,365), breaks = c(1, 100, 200, 300, 365)) +
+  # reverse y axis to get sites in the desired order
+  # scale_y_discrete(limits = rev) +
+  
+  # labels
+  labs(x = 'Day of the year', y = 'Latitude') +
+  theme_classic() +
+  theme(legend.position = 'right')
+
+# Save this plot: maxima depending on latitude
+# ggsave('Dino_max_lat.tiff', dpi = 300, height = 180, width = 150,
+#        units = 'mm', compression = 'lzw')
+
+## What if instead of mean+-sd, we plot the peaks of the GAM?
+
+# First, let's add the latitude to the GAM data
+
+# Summarise GAM data to remove the year
+GAM_peak_plot <- GAM_peak_select2 %>%
+  filter(Day < 300) %>%
+  group_by(Code_point_Libelle, period) %>%
+  summarise(Daymax = mean(Day), .groups = 'keep')
+
+GAM_peak_plot <- left_join(GAM_peak_plot, Maxima_Dino_2_stats_select,
+                           by = c('Code_point_Libelle', 'period'))
+
+# Plot this
+ggplot() +
+  
+  # All maxima as smaller translucid points
+  geom_point(data = Maxima_Dino_select, aes(x = Day, y = Latitude, 
+                                            fill = Code_point_Libelle,
+                                            shape = as.factor(period),
+                                            alpha = log10(true_count)),
+             stroke = 0, color = 'transparent',
+             size = 2.5) +
+  
+  ## Peaks from the GAM (no error bars)
+  
+  # points for GAM peaks
+  geom_point(data = GAM_peak_plot,
+             aes(y = median.lat, x = Daymax, 
+                 fill = Code_point_Libelle, shape = as.factor(period)),
+             size = 4, color = 'grey10', stroke = .5) +
+  
+  # Color scales
+  scale_color_discrete(type = pheno_palette8, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette8, guide = 'none') +
+  # Shape
+  scale_shape_manual(values = c(21, 24), guide = 'none') +
+  # Transparency
+  scale_alpha_continuous(guide = 'none') +
+  
+  ## Axis stuff
+  scale_x_continuous(limits = c(1,365), breaks = c(1, 100, 200, 300, 365)) +
+  # reverse y axis to get sites in the desired order
+  # scale_y_discrete(limits = rev) +
+  
+  # labels
+  labs(x = 'Day of the year', y = 'Latitude') +
+  theme_classic() +
+  theme(legend.position = 'right')
+
+# Save this plot: maxima depending on latitude
+# ggsave('Dino_max_lat_GAM_peak.tiff', dpi = 300, height = 180, width = 150,
+#        units = 'mm', compression = 'lzw')
 
 ### Focusing on Ouest Loscolo - different years ####
 
