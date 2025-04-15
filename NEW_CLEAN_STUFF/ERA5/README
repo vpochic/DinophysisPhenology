@@ -1,2 +1,0 @@
-This folder contains the data extracted from the ERA5 atmospheric model.
-The hourly data on which the script 'ERA5_data_management.R' runs is stored elsewhere (address) because it is too big.
