@@ -1,6 +1,6 @@
 ###### Random forest model for Dinophysis phenology ###
 ## V. POCHIC
-# 2024-12-03
+# 2025-04-15
 
 # The goal here is to apply a random forest model to our data on Dinophysis
 # accumulation/loss rates, in order to identify the variables that are best
@@ -14,9 +14,6 @@
 # Deriv_GAMs_DinoPhenology_REPHY.R (for the derivatives = acc. rates)
 # Dino_phenology_heatmaps.R (for the environmental variables)
 
-# We'll see in the future if we add biotic variables (alloxanthin and 
-# Mesodinium cell counts)
-
 ### Packages ####
 library(tidymodels)
 library(tidyverse)
@@ -28,7 +25,7 @@ library(DescTools)
 ## Part 1: Dinophysis sampling data ####
 # That's the file Season_Dino.csv with all sampling events in all sites for
 # 2007-2022
-Season_Dino <- read.csv2('Season_Dino.csv', header = TRUE, 
+Season_Dino <- read.csv2('Data/REPHY_outputs/Season_Dino.csv', header = TRUE, 
                          fileEncoding = 'ISO-8859-1')
 
 
@@ -59,8 +56,8 @@ Season_Dino_12sites <- filter(Season_Dino, Code_point_Libelle %in%
 ## Part 2: Mesodinium sampling data ####
 # That's the file Season_Meso.csv with all sampling events in all sites for
 # 2007-2022
-Season_Meso <- read.csv2('Season_Meso_20250318.csv', header = TRUE, 
-                         fileEncoding = 'ISO-8859-1')
+Season_Meso <- read.csv2('Data/REPHY_outputs/Season_Meso_20250318.csv', 
+                         header = TRUE, fileEncoding = 'ISO-8859-1')
 
 
 Season_Meso_12sites <- filter(Season_Meso, Code_point_Libelle %in% 
@@ -91,8 +88,8 @@ Season_Meso_12sites <- filter(Season_Meso, Code_point_Libelle %in%
 ## Part 3: Pigment data ####
 # We want to get the HPLC pigment data to look at the alloxanthin
 
-Table_pigments <- read.csv2('Table_pigments_2007-2022.csv', header = TRUE, 
-                         fileEncoding = 'ISO-8859-1')
+Table_pigments <- read.csv2('Data/REPHY_outputs/Table_pigments_2007-2022.csv', 
+                            header = TRUE, fileEncoding = 'ISO-8859-1')
 
 # Only keep the 4 sites we will use for our second RF model
 Table_pigments_select <- filter(Table_pigments, Code_point_Libelle %in% 
@@ -109,18 +106,18 @@ Table_pigments_select <- filter(Table_pigments, Code_point_Libelle %in%
 
 # We import the dataframe of the derivative of the GAM.
 # From the script Deriv_GAMs_DinoPhenology...
-gam_Dino.d <- read.csv2('Derivatives_GAM_Dino_12sites_20241003.csv', 
+gam_Dino.d <- read.csv2('Data/GAM_outputs/Derivatives_GAM_Dino_12sites_20241203.csv', 
                         header = TRUE, fileEncoding = 'ISO-8859-1')
 
 # Or with the multiyear data
-gam_Dino.d_multiyear <- read.csv2('gam_Dino_multiyear_deriv_20241203.csv', 
+gam_Dino.d_multiyear <- read.csv2('Data/GAM_outputs/gam_Dino_multiyear_deriv_20241204.csv', 
                                   header = TRUE, fileEncoding = 'ISO-8859-1') %>%
   # Put Date in date format
   mutate(Date = ymd(Date))
 
 ## Part 5: environmental data ####
 ### Hydrological parameters form the REPHY dataset
-Table_hydro <- read.csv2('Table1_hydro_select.csv', header = TRUE, 
+Table_hydro <- read.csv2('Data/REPHY_outputs/Table1_hydro_select.csv', header = TRUE, 
                          fileEncoding = "ISO-8859-1")
 
 # Select only stations of interest from 2007 --> 2022
@@ -165,7 +162,7 @@ isNA_CHLOROA <- filter(Table_hydro_select, is.na(CHLOROA) == TRUE)
 ## Part 6: Model data ####
 
 ### Stratification index from the GAMAR model ##
-Table_stratif <- read.csv2('Stratif_index_GAMAR_12sites.csv',
+Table_stratif <- read.csv2('Data/Models/GAMAR/Outputs/Stratif_index_GAMAR_12sites.csv',
                            header = TRUE, fileEncoding = 'ISO-8859-1') %>%
   # Getting it in date format
   mutate(Target_Date = ymd_hms(Target_Date))
@@ -181,26 +178,26 @@ Table_stratif <- read.csv2('Stratif_index_GAMAR_12sites.csv',
 
 ## Daily
 # Mean
-Table_era5_daily_mean <- read.csv2('ERA5/era5_dataset_daily_mean.csv', 
+Table_era5_daily_mean <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_daily_mean.csv', 
                                    header = TRUE, fileEncoding = 'ISO-8859-1')
 # Median
-Table_era5_daily_median <- read.csv2('ERA5/era5_dataset_daily_mean.csv', 
+Table_era5_daily_median <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_daily_mean.csv', 
                                    header = TRUE, fileEncoding = 'ISO-8859-1')
 
 ## Weekly
 # Mean
-Table_era5_weekly_mean <- read.csv2('ERA5/era5_dataset_weekly_mean.csv', 
+Table_era5_weekly_mean <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_weekly_mean.csv', 
                                    header = TRUE, fileEncoding = 'ISO-8859-1')
 # Median
-Table_era5_weekly_median <- read.csv2('ERA5/era5_dataset_weekly_mean.csv', 
+Table_era5_weekly_median <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_weekly_mean.csv', 
                                      header = TRUE, fileEncoding = 'ISO-8859-1')
 
 ## Fortnightly
 # Mean
-Table_era5_fortnight_mean <- read.csv2('ERA5/era5_dataset_fortnight_mean.csv', 
+Table_era5_fortnight_mean <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_fortnight_mean.csv', 
                                     header = TRUE, fileEncoding = 'ISO-8859-1')
 # Median
-Table_era5_fortnight_median <- read.csv2('ERA5/era5_dataset_fortnight_mean.csv', 
+Table_era5_fortnight_median <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_fortnight_mean.csv', 
                                     header = TRUE, fileEncoding = 'ISO-8859-1')
 
 #### Joining datasets ####
@@ -221,10 +218,10 @@ Table_data_RF <- left_join(Table_data_RF, Table_hydro_select,
 
 # Fantastic
 
-## Third, the ERA5 data (only fortnight mean for now)
-# events are associated by fortnight and year (and sampling site of course)
-Table_data_RF <- left_join(Table_data_RF, Table_era5_fortnight_mean, 
-                           by = c('Year', 'Fortnight', 'Code_point_Libelle'),
+## Third, the ERA5 data (only daily mean for now)
+# events are associated by day and year (and sampling site of course)
+Table_data_RF <- left_join(Table_data_RF, Table_era5_daily_mean, 
+                           by = c('Year', 'Day', 'Code_point_Libelle'),
                            suffix = c('',''))
 
 # Good.
@@ -262,6 +259,9 @@ ggplot(Table_data_RF_multiyear) +
 # curating scripts. We should correct that later.
 
 #### First random forest model: 10 sites with fewer parameters ####
+### 1.1. Daily data ####
+# For this first step, we will consider data at the daily level
+# In a second step, we will integrate everything over a period of 2 weeks
 
 ### Preparing model data ####
 
@@ -271,18 +271,33 @@ Table_data_RF_multiyear_select <- filter(Table_data_RF_multiyear,
                                          (Code_point_Libelle != 'Auger' &
                                           Code_point_Libelle != 'Teychan bis'))
 
+### We will split the dataset to have a training and a validation set
+## First, we will exclude 5 random years that will serve as our true validation 
+# set
+
+set.seed(123)
+
+Validation_years <- as_tibble(sample(unique(Table_data_RF_multiyear_select$Year), 5))
+
 # For the data table that we will use for the random forest, we only keep the
 # response variable (.derivative) and the predictor variables (TEMP, SALI,
-# CHLOROA, X.14.Day_Average_SI, ssr, tcc, u10, v10). Let's also try to keep
+# CHLOROA, Stratification_Index, ssr, tcc, u10, v10). Let's also try to keep
 # Code_point_Libelle to see if unmonitored local factors play a big role
-RF_data <- Table_data_RF_uniyear %>%
-select(.derivative, TEMP, SALI, CHLOROA, X14.Day_Average_SI, 
+RF_data <- Table_data_RF_multiyear_select %>%
+  # We take only the events in the years NOT included in the "Validation_years"
+  filter(Year %nin% Validation_years$value) %>%
+  # Then select parameters
+  select(.derivative, TEMP, SALI, CHLOROA, Stratification_Index, 
          ssr, tcc, u10, v10, Code_point_Libelle) %>%
   # We drop any NA value in these variables
   drop_na()
+  
 
-RF_data <- Table_data_RF_multiyear_select %>%
-  select(.derivative, TEMP, SALI, CHLOROA, X14.Day_Average_SI, 
+RF_data_valid <- Table_data_RF_multiyear_select %>%
+  # We take only the events in the years INCLUDED in the "Validation_years"
+  filter(Year %in% Validation_years$value) %>%
+  # Then select parameters
+  select(.derivative, TEMP, SALI, CHLOROA, Stratification_Index, 
          ssr, tcc, u10, v10, Code_point_Libelle) %>%
   # We drop any NA value in these variables
   drop_na()
@@ -294,7 +309,7 @@ ggplot(RF_data) +
   theme_classic()
 # Not really. just a little drop in Arcachon
 
-### We will split the dataset to have a training and a validation set
+# Standard procedure for random forest building
 splitdata_RF <- initial_split(RF_data)
 
 RF_train <- splitdata_RF %>%
@@ -305,7 +320,7 @@ RF_test <- splitdata_RF %>%
 
 # We set a seed to ensure that we get consistent results each time 
 # the code is run (because the split is randomly different each time)
-set.seed(234)
+set.seed(123)
 
 # 'strata = .derivative' allows us to ensure that different levels of the 
 # response variable (the derivative in our case) are present in each fold 
@@ -346,7 +361,7 @@ tune_wf <- workflow() %>%
   add_model(tune_spec)
 
 # We set the same seed as defined before
-set.seed(234)
+set.seed(123)
 
 # This step takes some time
 tune_res <- tune_grid(
@@ -379,10 +394,36 @@ final_RF <- finalize_model(
 
 final_RF
 
+## Model performance ####
+
+# With our split dataset (training vs testing), we will see how the model 
+# performs on independent data
+
+final_wf <- workflow() %>%
+  add_recipe(RF_recipe) %>%
+  add_model(final_RF)
+
+final_res <- final_wf %>%
+  last_fit(splitdata_RF)
+
+final_res %>%
+  collect_metrics()
+
+# I think to interprete this (the rmse) we need to know the order of magnitude 
+# of our response variable
+
+ggplot(data = Table_data_RF_multiyear_select) +
+  geom_histogram(aes(x = .derivative), binwidth = .02) +
+  # A red line representing the RMSE value
+  geom_vline(aes(xintercept = 0.129), color = 'red') +
+  geom_vline(aes(xintercept = -0.129), color = 'red') +
+  scale_y_continuous() +
+  theme_classic()
+
 ### Investigating the most important features of the model ####
 
 # keep the same seed
-set.seed(234)
+set.seed(123)
 
 final_RF %>%
   set_engine('ranger', importance = 'permutation') %>%
@@ -496,18 +537,18 @@ for (i in 1:20) {
 }
 
 # Save the result!
-write.csv2(dataplot_vip, 'Randomforest_vip_data_20250317.csv', 
-           row.names = FALSE, fileEncoding = 'ISO-8859-1')
+# write.csv2(dataplot_vip, 'Randomforest_vip_data_20250415.csv', 
+#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
 
 ## Variable importance plot ####
 
-# If necessary, import data previosuly saved
-dataplot_vip_import <- read.csv2('Randomforest_vip_data_20250317.csv', header = TRUE,
-                          fileEncoding = 'ISO-8859-1')
+# If necessary, import data previously saved
+# dataplot_vip_import <- read.csv2('Randomforest_vip_data_20250317.csv', header = TRUE,
+#                           fileEncoding = 'ISO-8859-1')
 
 # We pivot longer the values of variable importance to get tidy data
 
-dataplot_vip_tidy <- pivot_longer(dataplot_vip_import, cols = -c('Variable'), 
+dataplot_vip_tidy <- pivot_longer(dataplot_vip, cols = -c('Variable'), 
                                   names_to ='Seed') %>%
   group_by(Variable)
 
@@ -523,8 +564,8 @@ dataplot_vip_tidy <- dataplot_vip_tidy %>%
   mutate(Variable = as_factor(Variable)) %>%
   # relevel the factor in descending order of variable importance
   mutate(Variable = fct_relevel(Variable, 'ssr', 'TEMP', 'Code_point_Libelle',
-                                'tcc', 'v10', 'SALI', 'X14.Day_Average_SI', 
-                                'CHLOROA', 'u10'))
+                                'v10', 'SALI', 'Stratification_Index', 
+                                'CHLOROA', 'tcc', 'u10'))
 
 # Color palette
 palette_bretagne9 <- c('#FBA823', 'red3', '#8D6456', '#B47E24', '#FBB665',
@@ -550,7 +591,7 @@ ggplot(data = dataplot_vip_tidy, aes(x = Variable, y = value, color = Variable))
   theme_classic()
 
 # Save the plot
-# ggsave('VIP_RandomForest_10sites_20250318.tiff', width = 164, height = 130, units = 'mm',
+# ggsave('VIP_RandomForest_10sites_20250415.tiff', width = 164, height = 130, units = 'mm',
 #        compression = 'lzw', dpi = 300)
 
 # According to Dr. Bede Davies, it's better to represent it as mean +-std error
@@ -598,8 +639,8 @@ ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean,
   theme_classic()
 
 # Save the plot
-ggsave('VIP_RandomForest_meansd_20250318.tiff', width = 100, height = 120, units = 'mm',
-       compression = 'lzw', dpi = 300)
+# ggsave('VIP_RandomForest_meansd_20250415.tiff', width = 100, height = 120, units = 'mm',
+#        compression = 'lzw', dpi = 300)
 
 #### Second random forest model: 4 sites with more parameters ####
 
