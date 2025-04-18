@@ -210,11 +210,21 @@ ggplot() +
                      max(CPR_data$Latitude)))+
   # Labels
   labs(y = 'Latitude (degrees)', x = 'Longitude (degrees)',
-       title = "Dinophysis seasonality the NE Atlantic (CPR data)")+
+       title = "Dinophysis seasonality in the NE Atlantic (CPR data)")+
   theme_bw() +
   theme(legend.position = 'bottom')
 
 # Doesn't seem really decisive
+
+# But maybe we can look at it another way?
+
+ggplot(data = CPR_data_max) +
+  geom_point(aes(x = Month, y = lat.bin, color = as_factor(Month)), size = 2.5,
+             alpha = .8) +
+  scale_color_viridis(discrete = TRUE, guide = 'none') +
+  labs(y = 'Latitude (degrees)', x = 'Month with maximum Dinophysis count',
+       title = "Month vs latitude (Dino seasonality)")+
+  theme_classic()
 
 # Let's try something else
 
@@ -255,7 +265,7 @@ ggplot() +
   # Plotting the land
   geom_polygon(data = Worldmap, aes(x = long, y = lat, group = group), 
                fill = "grey80", color = 'gray10', linewidth = .25)+
-  coord_fixed(xlim=c(min(CPR_data$Longitude),
+  coord_fixed(xlim=c(-25,
                      max(CPR_data$Longitude)), 
               ylim=c(min(CPR_data$Latitude),
                      max(CPR_data$Latitude)))+
@@ -265,7 +275,48 @@ ggplot() +
   theme_bw() +
   theme(legend.position = 'bottom')
 
-# But there may be a bias in the monthly sampling. Let's have a look
+# Ok
+
+# The dot plot
+ggplot(data = CPR_data_season) +
+  geom_point(aes(x = mode_month, y = lat.bin, color = as_factor(mode_month)), size = 2.5,
+             alpha = .8) +
+  scale_color_viridis(discrete = TRUE, guide = 'none') +
+  labs(y = 'Latitude (degrees)', x = 'Month with most Dinophysis count',
+       title = "Month vs latitude (Dino seasonality)")+
+  theme_classic()
+
+# This is almost exactly the same figure than the one with the maximum Dinophysis
+# count.
+
+### Dino across latitudes with all the data
+
+CPR_data_Dino <- CPR_data %>%
+  # Get the date in the right format
+  # Create a date variable in date format
+  mutate(Date = paste(Year, Month, Day, sep = '-')) %>%
+  mutate(Date = ymd(Date)) %>%
+  # Get a julian day variable
+  mutate(Julian_day = yday(Date))
+
+# Plot it as a dotplot
+ggplot() +
+  # Observations without Dinophysis
+  geom_point(data = subset(CPR_data_Dino, Dinophysis_Total == 0),
+             aes(x = Julian_day, y = Latitude), color = 'gray70', alpha = .95) +
+  # Observations with Dinophysis
+  geom_point(data = subset(CPR_data_Dino, Dinophysis_Total>0),
+             aes(x = Julian_day, y = Latitude, color = log10(Dinophysis_Total)), 
+             size = 2.5,
+             alpha = .8) +
+  scale_color_viridis() +
+  labs(y = 'Latitude (degrees)', x = 'Julian day of observation',
+       title = "Dino observations (day vs latitude)")+
+  theme_classic() +
+  theme(legend.position = 'bottom')
+  
+
+# Is there a bias in the sampling itself? Let's have a look
 
 # Overall dataset
 ggplot(data = CPR_data_binned) + 
@@ -289,13 +340,13 @@ CPR_data_sampling <- CPR_data_binned %>%
 
 
 ggplot() +
-  # Plotting the tiles of longitude and latitude depending on Dinophysis 
-  # presence
+  # Plotting the tiles of longitude and latitude depending on the most sampled
+  # month
   geom_rect(data = CPR_data_sampling,
             aes(xmin = lon.bin-.25, xmax = lon.bin+.25,
                 ymin = lat.bin-.25, ymax = lat.bin+.25, # width = .5, height = .5,
                 fill = as_factor(mode_month))) +
-  scale_fill_viridis(option = 'viridis', discrete = TRUE) +
+  scale_fill_viridis(option = 'cividis', discrete = TRUE) +
   # Plotting the land
   geom_polygon(data = Worldmap, aes(x = long, y = lat, group = group), 
                fill = "grey80", color = 'gray10', linewidth = .25)+
@@ -308,6 +359,8 @@ ggplot() +
        title = "CPR sampling in the NE Atlantic")+
   theme_bw() +
   theme(legend.position = 'bottom')
+
+# No real pattern here.
 
 ### Regionalising ####
 
@@ -388,7 +441,7 @@ ggplot() +
   geom_polygon(data = regions_polygon, aes(x = lon, y = lat, group = region,
                                            color = as_factor(region)), 
                fill = "transparent", linewidth = 1)+
-  scale_color_discrete() +
+  scale_color_discrete(guide = 'none') +
   # Limits of the map
   coord_fixed(xlim=c(-25,
                      max(CPR_data$Longitude)), 
@@ -396,14 +449,43 @@ ggplot() +
                      max(CPR_data$Latitude)))+
   # Labels
   labs(y = 'Latitude (degrees)', x = 'Longitude (degrees)',
-       title = "Dinophysis in the NE Atlantic (CPR data)")+
+       title = "Dinophysis in the NE Atlantic (CPR data)", 
+       fill = 'Dinophysis presence index')+
   theme_bw() +
   theme(legend.position = 'bottom')
 
+## Save plot
+# ggsave('CPR_Dinophysis_presence_regions.tiff', height = 180, width = 164,
+#        units = 'mm', dpi = 300, compression = 'lzw')
+
 # Plot the seasonality of Dinophysis depending on the region
-ggplot(data = CPR_data_regions) +
+ggplot(data = subset(CPR_data_regions, region > 0)) +
   geom_point(aes(x = Julian_day, y = Dinophysis_Total,
                  color = as_factor(region))) +
   facet_wrap(facets = 'region', scales = 'free_y') +
   scale_color_discrete(guide = 'none') +
   theme_classic()
+
+## Save plot
+# ggsave('CPR_Dinophysis_seasonality_regions.tiff', height = 164, width = 164,
+#        units = 'mm', dpi = 300, compression = 'lzw')
+
+# Looking at timing of maximum
+CPR_data_max <- CPR_data_regions %>%
+  # Grouping by the bin variables
+  group_by(lat.bin, lon.bin) %>%
+  # Get only rows with maximum abundance
+  top_n(1, Dinophysis_Total) %>%
+  # Filter 0 or close to 0 abundances
+  filter(Dinophysis_Total > 1)
+
+# Plot the seasonality of Dinophysis depending on the region
+ggplot(data = subset(CPR_data_max, region > 0)) +
+  geom_point(aes(x = Julian_day, y = Latitude,
+                 color = log10(Dinophysis_Total))) +
+  geom_smooth(aes(x = Julian_day, y = Latitude),
+              method = 'lm', alpha = .3) +
+  facet_wrap(facets = 'region', scales= 'free_y') +
+  scale_color_viridis() +
+  theme_classic() +
+  theme(legend.position = 'bottom')
