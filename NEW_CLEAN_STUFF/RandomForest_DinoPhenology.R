@@ -20,6 +20,8 @@ library(tidyverse)
 library(vip)
 library(ranger)
 library(DescTools)
+library(viridis)
+library(ggpointdensity)
 
 ### Import data ####
 ## Part 1: Dinophysis sampling data ####
@@ -411,10 +413,23 @@ ggplot() +
 MeR_prediction <- Validation_data %>%
   mutate(predict(final_model,.))
 
-  ggplot(MeR_prediction) +
-  geom_point(aes(x = .derivative, y = .pred)) +
-    geom_abline(slope = 1, intercept = 0) +
-  theme_classic()
+# Calculate the rmse
+rmse <- rmse(MeR_prediction, truth = .derivative, estimate = .pred)
+rmse_character <- as.character(round(rmse$.estimate, digits = 3))
+
+# Plot
+ggplot(MeR_prediction) +
+geom_pointdensity(aes(x = .derivative, y = .pred)) +
+annotate(geom = 'text', x = 0.055, y = 0.12, 
+              label = c(paste('RMSE: ',
+                                         rmse_character,
+                                         '')),
+          color = 'black',
+          size = 3.25) +
+geom_abline(slope = 1, intercept = 0) +
+  geom_smooth(aes(x = .derivative, y = .pred), method = 'lm') +
+scale_color_viridis() +
+theme_classic()
 
 # I think to interprete this (the rmse) we need to know the order of magnitude 
 # of our response variable
@@ -721,15 +736,31 @@ ggplot(Table_data_RF2)+
 
 # For the data table that we will use for the random forest, we only keep the
 # response variable (.derivative) and the predictor variables (TEMP, SALI,
-# CHLOROA, X.14.Day_Average_SI, ssr, tcc, u10, v10). Let's also try to keep
-# Code_point_Libelle to see if unmonitored local factors play a big role
+# CHLOROA, X.14.Day_Average_SI, ssr, tcc, u10, v10).
 
 RF_data <- Table_data_RF2 %>%
-  select(.derivative, TEMP, SALI, CHLOROA, X14.Day_Average_SI, 
-         ssr, tcc, u10, v10, Code_point_Libelle, Mesodinium_genus, Allo,
+  # We get the Men er Roue sampling site out, we'll use it as our validation
+  # dataset
+  filter(Code_point_Libelle != 'Men er Roue') %>%
+  # Keeping only the desired variables
+  select(.derivative, TEMP, SALI, CHLOROA, Stratification_Index, 
+         ssr, tcc, u10, v10, Mesodinium_genus, Allo,
          NH4, PO4, SIOH, OXYGENE, NO3.NO2) %>%
   # We drop any NA value in these variables (should be done already)
   drop_na()
+
+# Keeping aside our validation dataset with the Men er Roue sampling site
+RF_valid <- Table_data_RF2 %>%
+  # We get the Men er Roue sampling site out, we'll use it as our validation
+  # dataset
+  filter(Code_point_Libelle == 'Men er Roue') %>%
+  # Keeping only the desired variables
+  select(.derivative, TEMP, SALI, CHLOROA, Stratification_Index, 
+         ssr, tcc, u10, v10, Mesodinium_genus, Allo,
+         NH4, PO4, SIOH, OXYGENE, NO3.NO2) %>%
+  # We drop any NA value in these variables (should be done already)
+  drop_na()
+
 
 # Same number of events (469)
 
@@ -817,6 +848,64 @@ final_RF <- finalize_model(
   best_rmse)
 
 final_RF
+
+## Model performance ####
+
+# With our split dataset (training vs testing), we will see how the model 
+# performs on independent data
+
+final_wf <- workflow() %>%
+  add_recipe(RF_recipe) %>%
+  add_model(final_RF)
+
+final_res <- final_wf %>%
+  last_fit(splitdata_RF)
+
+final_res %>%
+  collect_metrics()
+
+final_model <- final_res %>%
+  extract_workflow()
+
+final_res %>%
+  unnest(cols=.predictions) %>%
+  ggplot() +
+  geom_point(aes(x = .derivative, y = .pred)) +
+  theme_classic()
+
+# Using the model on the validation dataset
+MeR_prediction <- RF_valid %>%
+  mutate(predict(final_model,.))
+
+# Calculate the rmse
+rmse <- rmse(MeR_prediction, truth = .derivative, estimate = .pred)
+rmse_character <- as.character(round(rmse$.estimate, digits = 3))
+
+# Plot
+ggplot(MeR_prediction) +
+  geom_pointdensity(aes(x = .derivative, y = .pred)) +
+  annotate(geom = 'text', x = 0.04, y = -0.1, 
+           label = c(paste('RMSE: ',
+                           rmse_character,
+                           '')),
+           color = 'black',
+           size = 3.25) +
+  geom_smooth(aes(x = .derivative, y = .pred), method = 'lm') +
+  geom_abline(slope = 1, intercept = 0) +
+  scale_color_viridis() +
+  theme_classic()
+
+# I think to interprete this (the rmse) we need to know the order of magnitude 
+# of our response variable
+
+ggplot(data = Table_data_RF_multiyear_select) +
+  geom_histogram(aes(x = .derivative), binwidth = .02) +
+  # A red line representing the RMSE value
+  geom_vline(aes(xintercept = 0.129), color = 'red') +
+  geom_vline(aes(xintercept = -0.129), color = 'red') +
+  scale_y_continuous() +
+  theme_classic()
+
 
 ### Investigating the most important features of the model ####
 
