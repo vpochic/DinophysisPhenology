@@ -277,37 +277,29 @@ Table_data_RF_multiyear_select <- filter(Table_data_RF_multiyear,
 
 set.seed(123)
 
-Validation_years <- as_tibble(sample(unique(Table_data_RF_multiyear_select$Year), 5))
+## Validation dataset
+# We keep the data for one sampling site, all years, to use as our validation
+# dataset
+Validation_data <- filter(Table_data_RF_multiyear_select, 
+                          Code_point_Libelle == 'Men er Roue') %>%
+  # Then select parameters
+  select(.derivative, TEMP, SALI, CHLOROA, Stratification_Index, 
+         ssr, tcc, u10, v10) %>%
+  # We drop any NA value in these variables
+  drop_na()
 
 # For the data table that we will use for the random forest, we only keep the
 # response variable (.derivative) and the predictor variables (TEMP, SALI,
 # CHLOROA, Stratification_Index, ssr, tcc, u10, v10). Let's also try to keep
 # Code_point_Libelle to see if unmonitored local factors play a big role
 RF_data <- Table_data_RF_multiyear_select %>%
-  # We take only the events in the years NOT included in the "Validation_years"
-  filter(Year %nin% Validation_years$value) %>%
+  # We filter out the sampling site we will use for validation
+  filter(Code_point_Libelle != 'Men er Roue') %>%
   # Then select parameters
   select(.derivative, TEMP, SALI, CHLOROA, Stratification_Index, 
-         ssr, tcc, u10, v10, Code_point_Libelle) %>%
+         ssr, tcc, u10, v10) %>%
   # We drop any NA value in these variables
   drop_na()
-  
-
-RF_data_valid <- Table_data_RF_multiyear_select %>%
-  # We take only the events in the years INCLUDED in the "Validation_years"
-  filter(Year %in% Validation_years$value) %>%
-  # Then select parameters
-  select(.derivative, TEMP, SALI, CHLOROA, Stratification_Index, 
-         ssr, tcc, u10, v10, Code_point_Libelle) %>%
-  # We drop any NA value in these variables
-  drop_na()
-
-# Did this modify the balance between sites?
-ggplot(RF_data) +
-  geom_histogram(aes(x = Code_point_Libelle, fill = Code_point_Libelle),
-                 stat = 'count') +
-  theme_classic()
-# Not really. just a little drop in Arcachon
 
 # Standard procedure for random forest building
 splitdata_RF <- initial_split(RF_data)
@@ -330,11 +322,8 @@ RF_train_folds
 
 # This seems ok
 
-# We tell the recipe of the model (predict '.derivative' based on everything else,
-# and we DON'T convert our categorical variable ('Code_point_Libelle') into a dummy 
-# variable
-RF_recipe <- recipe(.derivative ~ ., data = RF_train) # %>%
-# step_dummy(Code_point_Libelle)
+# We tell the recipe of the model (predict '.derivative' based on everything else
+RF_recipe <- recipe(.derivative ~ ., data = RF_train)
 
 # We create a 'juiced' dataset with the recipe applied to it, for later on
 RF_juiced <- prep(RF_recipe) %>%
@@ -408,6 +397,24 @@ final_res <- final_wf %>%
 
 final_res %>%
   collect_metrics()
+
+final_model <- final_res %>%
+  extract_workflow()
+
+final_res %>%
+  unnest(cols=.predictions) %>%
+ggplot() +
+  geom_point(aes(x = .derivative, y = .pred)) +
+  theme_classic()
+
+# Using the model on the validation dataset
+MeR_prediction <- Validation_data %>%
+  mutate(predict(final_model,.))
+
+  ggplot(MeR_prediction) +
+  geom_point(aes(x = .derivative, y = .pred)) +
+    geom_abline(slope = 1, intercept = 0) +
+  theme_classic()
 
 # I think to interprete this (the rmse) we need to know the order of magnitude 
 # of our response variable
