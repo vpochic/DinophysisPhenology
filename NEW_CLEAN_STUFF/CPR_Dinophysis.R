@@ -1,6 +1,6 @@
 ### CPR data for Dinophysis phenology ###
 
-# V. POCHIC, 2025-04-15
+# V. POCHIC, 2025-04-25
 
 # This script is made for plotting and analysing data from the CPR.
 
@@ -8,6 +8,7 @@
 
 library(tidyverse)
 library(viridis)
+library(cmocean)
 library(ggmap)
 library(mapdata)
 library(maps)
@@ -29,17 +30,18 @@ Worldmap <- map_data('worldHires')
 ggplot() +
   # Plotting the land
   geom_polygon(data = Worldmap, aes(x = long, y = lat, group = group), 
-                        fill = "white", color = 'gray10', linewidth = .25)+
+                        fill = "grey80", color = 'gray10', linewidth = .25)+
   coord_fixed(xlim=c(-25,
                      max(CPR_data$Longitude)), 
               ylim=c(min(CPR_data$Latitude),
                      max(CPR_data$Latitude)), ratio=1)+
-  # Plotting the samples without Dinophysis
-  geom_point(data = subset(CPR_data, Dinophysis_Total == 0), 
+  # Plotting the samples without Dinophysis (many samples have a weird value of
+  # 1e-10 for Dinophysis, we will consider it as an absence)
+  geom_point(data = subset(CPR_data, Dinophysis_Total < 1), 
              aes(x = Longitude, y = Latitude),
              color = 'black', size = .5, alpha = .8) +
   # Plotting the samples with Dinophysis
-  geom_point(data = subset(CPR_data, Dinophysis_Total > 0), 
+  geom_point(data = subset(CPR_data, Dinophysis_Total > 1), 
              aes(x = Longitude, y = Latitude),
              color = 'red', size = .5, alpha = .8) +
   labs(y = 'Latitude (degrees)', x = 'Longitude (degrees)',
@@ -48,7 +50,7 @@ ggplot() +
 
 # Nice one!
 
-# ggsave('CPR_map_dotplot.tiff', width = 164, height = 180, units = 'mm',
+# ggsave('CPR_map_dotplot2.tiff', width = 164, height = 180, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
 ## Bin the data by coordinate tiles ####
@@ -92,7 +94,7 @@ CPR_data_binned <- CPR_data %>%
 CPR_data_sum <- CPR_data_binned %>%
   # Create a dummy variable that identifies Dinophysis positive counts
   # (0 = no Dinophysis in sample, 1 = 1 or more Dinophysis in sample)
-  mutate(Dinodummy = ifelse(Dinophysis_Total > 0, 1, 0)) %>%
+  mutate(Dinodummy = ifelse(Dinophysis_Total > 1, 1, 0)) %>%
   # Grouping by the bin variables
   group_by(lat.bin, lon.bin) %>%
   # Summarise the dataset as we wish to
@@ -134,13 +136,14 @@ ggplot() +
                      max(CPR_data$Latitude)))+
   # Labels
   labs(y = 'Latitude (degrees)', x = 'Longitude (degrees)',
-       title = "Dinophysis in the NE Atlantic (CPR data)")+
+       title = "Dinophysis in the NE Atlantic (CPR data)", 
+       fill = 'Dinophysis presence index') +
   theme_bw() +
   theme(legend.position = 'bottom')
 
 # This seems ok
 
-# ggsave('CPR_heatmap_Dino_presence2.tiff', width = 164, height = 180, units = 'mm',
+# ggsave('CPR_heatmap_Dino_presence3.tiff', width = 164, height = 180, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
 ## Plotting a heatmap of sampling effort ####
@@ -163,7 +166,8 @@ ggplot() +
                      max(CPR_data$Latitude)))+
   # Labels
   labs(y = 'Latitude (degrees)', x = 'Longitude (degrees)',
-       title = "CPR sampling in the NE Atlantic")+
+       title = "CPR sampling in the NE Atlantic", 
+       fill = 'Number of samples (log10)') +
   theme_bw() +
   theme(legend.position = 'bottom')
 
@@ -380,11 +384,11 @@ CPR_data_regions <- CPR_data_binned %>%
     1,
     ifelse(
       # Celtic seas (#2)
-      lat.bin <= 53 & lat.bin >= 45 & lon.bin <= -1 & lon.bin >= -10.5,
+      lat.bin <= 52 & lat.bin >= 48 & lon.bin <= -2.5 & lon.bin >= -9,
       2,
       ifelse(
         # Western North Sea (#3)
-        lat.bin <= 60 & lat.bin >= 52.5 & lon.bin < 3.5 & lon.bin >= -3.5,
+        lat.bin <= 60 & lat.bin >= 52.5 & lon.bin <= 1.5 & lon.bin >= -3.5,
         3,
         ifelse(
           # Eastern North Sea (#4)
@@ -396,7 +400,11 @@ CPR_data_regions <- CPR_data_binned %>%
   mutate(Date = paste(Year, Month, Day, sep = '-')) %>%
   mutate(Date = ymd(Date)) %>%
   # Get a julian day variable
-  mutate(Julian_day = yday(Date))
+  mutate(Julian_day = yday(Date)) %>%
+  # Creating "week" and "fortnight" variables
+  mutate(Week = week(Date)) %>%
+  # 'ceiling' takes the upper integer of a decimal number
+  mutate(Fortnight = ceiling(Week/2))
 
 # Do the regions correspond to what we want?
 ggplot() +
@@ -427,6 +435,10 @@ ggplot() +
 regions_polygon <- read.csv2('Data/CPR/CPR_regions_polygon.csv', header = TRUE,
                              fileEncoding = 'ISO-8859-1')
 
+# And a georeferenced tibble to plot the id of each region
+regions_id <- read.csv2('Data/CPR/CPR_regions_ids.csv', header = TRUE,
+                        fileEncoding = 'ISO-8859-1')
+
 ggplot() +
   # Plotting the tiles of longitude and latitude depending on Dinophysis presence
   geom_rect(data = CPR_data_sum,
@@ -441,6 +453,9 @@ ggplot() +
   geom_polygon(data = regions_polygon, aes(x = lon, y = lat, group = region,
                                            color = as_factor(region)), 
                fill = "transparent", linewidth = 1)+
+  # Plotting the id of each region
+  geom_text(data = regions_id, aes(x = lon, y = lat, color = as_factor(region),
+                                   label = region), size = 6)+
   scale_color_discrete(guide = 'none') +
   # Limits of the map
   coord_fixed(xlim=c(-25,
@@ -455,12 +470,14 @@ ggplot() +
   theme(legend.position = 'bottom')
 
 ## Save plot
-# ggsave('CPR_Dinophysis_presence_regions.tiff', height = 180, width = 164,
-#        units = 'mm', dpi = 300, compression = 'lzw')
+ggsave('CPR_Dinophysis_presence_regions2.tiff', height = 180, width = 164,
+       units = 'mm', dpi = 300, compression = 'lzw')
 
 # Plot the seasonality of Dinophysis depending on the region
 ggplot(data = subset(CPR_data_regions, region > 0)) +
-  geom_point(aes(x = Julian_day, y = Dinophysis_Total,
+  # Here we try to divide by the lowest number of Dinophysis recorded, to get
+  # a somewhat continuous distribution of our data.
+  geom_point(aes(x = Julian_day, y = (Dinophysis_Total/15000),
                  color = as_factor(region))) +
   facet_wrap(facets = 'region', scales = 'free_y') +
   scale_color_discrete(guide = 'none') +
@@ -489,3 +506,156 @@ ggplot(data = subset(CPR_data_max, region > 0)) +
   scale_color_viridis() +
   theme_classic() +
   theme(legend.position = 'bottom')
+
+### Hovmoller diagrams ####
+
+# We'll try to plot the seasonality of Dinophysis for each region across time,
+# with a Hovmoller diagram
+
+CPR_data_hovmoller <- CPR_data_regions %>%
+  # We convert the infinitesimal values into zeros
+  mutate(Dinophysis_Total = ifelse(Dinophysis_Total < 1, 0,
+                                   Dinophysis_Total)) %>%
+  # We then group by Year and Month and region
+  group_by(region, Year, Month) %>%
+  # Process like before
+  # Create a dummy variable that identifies Dinophysis positive counts
+  # (0 = no Dinophysis in sample, 1 = 1 or more Dinophysis in sample)
+  mutate(Dinodummy = ifelse(Dinophysis_Total > 1, 1, 0)) %>%
+  # Summarise the dataset as we wish to
+  summarise(
+    # mean of Dinophysis counted
+    mean_Dino = mean(Dinophysis_Total),
+    # Total sum of Dinophysis counted
+    sumDino = sum(Dinophysis_Total),
+    # Number of samples with Dinophysis
+    nsamples_Dino = sum(Dinodummy),
+    # Total number of samples
+    nsamples = n(),
+    .groups = 'keep')
+
+# Create a variable of the proportion of Dinophysis "positive" samples
+CPR_data_hovmoller <- CPR_data_hovmoller %>%
+  mutate(prop_pos = nsamples_Dino/nsamples)
+
+### First, let's create a Hovmoller diagram of sampling effort in the different 
+# regions
+
+ggplot(data = subset(CPR_data_hovmoller, region > 0)) +
+  geom_tile(aes(x = Year, y = Month, fill = log10(nsamples+1))) +
+  scale_fill_viridis(option = 'plasma') +
+  facet_wrap(facets = 'region') +
+  scale_y_continuous(limits = c(0, 13), 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  labs(title = 'Sampling effort over the study period,
+by region',
+       fill = 'Number of samples (log10)') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# Save that!
+# ggsave('CPR_Hovmoller_sampling.tiff', height = 150, width = 164, units = 'mm',
+#        dpi = 300, compression = 'lzw')
+
+### Then, Hovmoller diagram of mean Dinophysis abundance
+
+ggplot(data = subset(CPR_data_hovmoller, region > 0)) +
+  geom_tile(aes(x = Year, y = Month, fill = log10(mean_Dino+1))) +
+  scale_fill_viridis() +
+  facet_wrap(facets = 'region') +
+  scale_y_continuous(limits = c(0, 13), 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  labs(title = 'Dinophysis seasonality over the study period, 
+by region',
+       fill = 'Mean abundance of Dinophysis (log10)') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# Save that!
+# ggsave('CPR_Hovmoller_abundance.tiff', height = 150, width = 164, units = 'mm',
+#        dpi = 300, compression = 'lzw')
+
+### Then, Hovmoller diagram of Dinophysis presence index
+
+ggplot(data = subset(CPR_data_hovmoller, region > 0)) +
+  geom_tile(aes(x = Year, y = Month, 
+                fill = log10(mean_Dino+1)*prop_pos*log10(nsamples+1))) +
+  scale_fill_viridis() +
+  facet_wrap(facets = 'region') +
+  scale_y_continuous(limits = c(0, 13), 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  labs(title = 'Dinophysis seasonality over the study period, 
+by region',
+       fill = 'Dinophysis presence index') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# Save that!
+# ggsave('CPR_Hovmoller_DPI.tiff', height = 150, width = 164, units = 'mm',
+#        dpi = 300, compression = 'lzw')
+
+### Hovmoller diagrams by fortnight (does not work well) ####
+
+# Is it better to visualise by fortnight rather than month?
+  
+# Let's see
+
+CPR_data_hovmoller_fortnight <- CPR_data_regions %>%
+  # We convert the infinitesimal values into zeros
+  mutate(Dinophysis_Total = ifelse(Dinophysis_Total < 1, 0,
+                                   Dinophysis_Total)) %>%
+  # We then group by Year and Fortnight and region
+  group_by(region, Year, Fortnight) %>%
+  # Process like before
+  # Create a dummy variable that identifies Dinophysis positive counts
+  # (0 = no Dinophysis in sample, 1 = 1 or more Dinophysis in sample)
+  mutate(Dinodummy = ifelse(Dinophysis_Total > 1, 1, 0)) %>%
+  # Summarise the dataset as we wish to
+  summarise(
+    # mean of Dinophysis counted
+    mean_Dino = mean(Dinophysis_Total),
+    # Total sum of Dinophysis counted
+    sumDino = sum(Dinophysis_Total),
+    # Number of samples with Dinophysis
+    nsamples_Dino = sum(Dinodummy),
+    # Total number of samples
+    nsamples = n(),
+    .groups = 'keep')
+
+# Create a variable of the proportion of Dinophysis "positive" samples
+CPR_data_hovmoller <- CPR_data_hovmoller %>%
+  mutate(prop_pos = nsamples_Dino/nsamples)
+
+### First, let's create a Hovmoller diagram of sampling effort in the different 
+# regions
+
+ggplot(data = subset(CPR_data_hovmoller_fortnight, region > 0)) +
+  geom_tile(aes(x = Year, y = Fortnight, fill = log10(nsamples+1))) +
+  scale_fill_viridis(option = 'plasma') +
+  facet_wrap(facets = 'region') +
+  scale_y_continuous(limits = c(0, 27), 
+                     breaks = c(1,5,10,15,26)) +
+  labs(title = 'Sampling effort over the study period,
+by region',
+       fill = 'Number of samples (log10)') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# No, it does not improve visualisation. Many fortnights were left unsampled 
+# over the study period
+
+### Then, Hovmoller diagram of mean Dinophysis abundance
+
+ggplot(data = subset(CPR_data_hovmoller_fortnight, region > 0)) +
+  geom_tile(aes(x = Year, y = Fortnight, fill = log10(mean_Dino+1))) +
+  scale_fill_viridis() +
+  facet_wrap(facets = 'region') +
+  scale_y_continuous(limits = c(0, 27), 
+                     breaks = c(1,5,10,15,26)) +
+  labs(title = 'Dinophysis seasonality over the study period, 
+by region',
+       fill = 'Mean abundance of Dinophysis (log10)') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# Same thing
