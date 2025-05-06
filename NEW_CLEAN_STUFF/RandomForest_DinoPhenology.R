@@ -1,6 +1,6 @@
 ###### Random forest model for Dinophysis phenology ###
 ## V. POCHIC
-# 2025-04-15
+# 2025-05-06
 
 # The goal here is to apply a random forest model to our data on Dinophysis
 # accumulation/loss rates, in order to identify the variables that are best
@@ -407,7 +407,15 @@ final_res %>%
   unnest(cols=.predictions) %>%
 ggplot() +
   geom_point(aes(x = .derivative, y = .pred)) +
+  geom_abline(slope = 1, intercept = 0, color = 'red') +
+  labs(title = 'Model performance (training dataset)',
+       x = 'True values', y = 'Predicted values') +
   theme_classic()
+
+# Save this plot
+# ggsave('Plots/RF_models/Modelperf_RF10inst_training.tiff',
+#        height = 140, width = 140, units = 'mm',
+#        dpi = 300, compression = 'lzw')
 
 # Using the model on the validation dataset
 MeR_prediction <- Validation_data %>%
@@ -419,28 +427,55 @@ rmse_character <- as.character(round(rmse$.estimate, digits = 3))
 
 # Plot
 ggplot(MeR_prediction) +
-geom_pointdensity(aes(x = .derivative, y = .pred)) +
-annotate(geom = 'text', x = 0.055, y = 0.12, 
-              label = c(paste('RMSE: ',
-                                         rmse_character,
-                                         '')),
-          color = 'black',
-          size = 3.25) +
-geom_abline(slope = 1, intercept = 0) +
+  # Points
+geom_point(aes(x = .derivative, y = .pred), color = '#2156A1') +
+  # Lines
+  geom_abline(slope = 1, intercept = 0, color = 'red') +
   geom_smooth(aes(x = .derivative, y = .pred), method = 'lm') +
-scale_color_viridis() +
+  # RMSE
+  annotate(geom = 'text', x = 0.055, y = 0.033, 
+           label = c(paste('RMSE: ',
+                           rmse_character,
+                           '')),
+           color = 'black',
+           size = 3.25) +
+  labs(title = 'Model performance
+(validation dataset: Men er Roue site)',
+       x = 'True values', y = 'Predicted values') +
 theme_classic()
+
+# Save this plot
+# ggsave('Plots/RF_models/Modelperf_RF10inst_valid.tiff',
+#        height = 140, width = 140, units = 'mm',
+#        dpi = 300, compression = 'lzw')
 
 # I think to interprete this (the rmse) we need to know the order of magnitude 
 # of our response variable
 
 ggplot(data = Table_data_RF_multiyear_select) +
-  geom_histogram(aes(x = .derivative), binwidth = .02) +
+  geom_histogram(aes(x = .derivative), binwidth = .01) +
   # A red line representing the RMSE value
-  geom_vline(aes(xintercept = 0.129), color = 'red') +
-  geom_vline(aes(xintercept = -0.129), color = 'red') +
+  geom_vline(aes(xintercept = 0.022), color = 'red') +
+  geom_vline(aes(xintercept = -0.022), color = 'red') +
+  # Text
+  annotate(geom = 'text', x = 0.25, y = 500, 
+           label = c(paste('RMSE: ',
+                           rmse_character,
+                           '')),
+           color = 'red',
+           size = 3.25) +
+  # Labels
+  labs(title = 'RMSE compared to response
+variable distribution', x = 'Count', y = 'Value of response variable') +
   scale_y_continuous() +
+  # Set limits to x axis to "zoom in"
+  scale_x_continuous(limits = c(-0.5,0.5)) +
   theme_classic()
+
+# Save this plot
+# ggsave('Plots/RF_models/RMSE_vs_values_RF10inst.tiff',
+#        height = 140, width = 140, units = 'mm',
+#        dpi = 300, compression = 'lzw')
 
 ### Investigating the most important features of the model ####
 
