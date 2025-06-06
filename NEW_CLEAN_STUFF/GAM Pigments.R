@@ -75,16 +75,16 @@ gam_CHLOROA <- gam(data = Table_CHLOROA_factor,
                    # Only a spline for the day of the year
                    # The use of a cyclic basis spline helps to make ends meet at the
                    # first and last days of the year
-                   # 'k = -1' allows the model to fix the 'best' number of basic
-                   # functions (= knots)
-                   formula = CHLOROA~s(Day, bs = 'cc', k = -1,
+                   # 'k = 7' allows the model use 7 basic functions at most.
+                   # This ensures that the model isn't too wiggly.
+                   formula = CHLOROA~s(Day, bs = 'cc', k = 10,
                                        # separate each site
                                           by = Code_point_Libelle) 
                    # We add the Year as a random effect. This will help to assess and
                    # smooth the effects of interannual variability in the phenology
                    + s(Year, bs = 're', k = -1),
-                   # Using a Gaussian distribution
-                   family = scat(),
+                   # Using a Gamma distribution (close to a normal distribution)
+                   family = Gamma(),
                    # Restricted maximum likelihood estimation (recommended method)
                    method = 'REML')
 
@@ -120,8 +120,8 @@ gam_CHLOROA_newdata <- mutate(gam_CHLOROA_newdata,
                               right_lwr = ilink(fit_link - (2 * se_link)))
 # Check the confidence interval. It should not extend below 0 (negative chla
 # values are impossible). But it does (slightly), and i don't know what to do about it.
-min(gam_CHLOROA_newdata$right_lwr) # Negative :(
-min(gam_CHLOROA_newdata$fit_resp) # Negative too, crap
+min(gam_CHLOROA_newdata$right_lwr) # Not negative :)
+min(gam_CHLOROA_newdata$fit_resp)
 max(gam_CHLOROA_newdata$right_upr)
 max(gam_CHLOROA_newdata$fit_resp)
 
@@ -160,8 +160,7 @@ ggplot(qq_data)+
   theme_classic() +
   labs(y = "Chl a concentration (microgram/L)", x = "Calendar day")
 
-# The highest values aren't matched well by the model. Maybe it will be better
-# when the Year is taken into account as random effect
+# It seems quite fine
 
 # And (qq-)plot
 qqplot_custom <- ggplot(qq_data) +
@@ -174,6 +173,8 @@ qqplot_custom <- ggplot(qq_data) +
        x="Theoretical Quantiles")
 
 qqplot_custom
+
+# This looks pretty fcking good
 
 # Save the plot
 # ggsave('Plots/GAMs/Pigments/qqplot_custom_chla_4sites.tiff', dpi = 300,
@@ -190,7 +191,7 @@ RvFplot_custom <- ggplot(qq_data)+
        x="Fitted Values")
 
 RvFplot_custom
-# Trumpet shaped plots here... Not great.
+# No trumpet here
 
 # Save the plot
 # ggsave('Plots/GAMs/Pigments/RvFplot_custom_chla_4sites.tiff', dpi = 300,
@@ -198,7 +199,7 @@ RvFplot_custom
 
 # And let's do one last diagnostic plot with histogram of residuals
 HistRes_custom <- ggplot(qq_data, aes(x = Residuals, fill = Code_point_Libelle))+
-  geom_histogram(binwidth = 1)+
+  geom_histogram(binwidth = .4)+
   scale_fill_discrete(type = pheno_palette4, guide = 'none') +
   theme_classic() +
   facet_wrap(facets = c('Code_point_Libelle')) +
@@ -209,7 +210,7 @@ HistRes_custom <- ggplot(qq_data, aes(x = Residuals, fill = Code_point_Libelle))
 HistRes_custom
 
 # Save the plot
-# ggsave('Plots/GAMs/Pigments/HistRes_custom_16sites.tiff', dpi = 300,
+# ggsave('Plots/GAMs/Pigments/HistRes_custom_chla_4sites.tiff', dpi = 300,
 #        height = 175, width = 250, units = 'mm', compression = 'lzw')
 
 # Plotting the whole model
@@ -360,7 +361,7 @@ response_pred_plot <- pred %>%
     # median
     median.fit = median(fit),
     # Confidence intervals
-    # Here we take minimum and maximum to encompass all possible years (17), as
+    # Here we take minimum and maximum to encompass all possible years (4), as
     # the prediction varies among years
     # Simultaneous confidence interval (CI)
     lwrS = min(lwrS), uprS = max(uprS),
@@ -388,7 +389,7 @@ response_pred_plot <- pred %>%
 # Checking the confidence intervals
 # minimum and maximum values
 min(response_pred_plot$median.fit)
-min(response_pred_plot$lwrS) # Not < 0, nice :)
+min(response_pred_plot$lwrS) # < 0, No use for this
 min(response_pred_plot$lwrP) # Not < 0, nice :)
 max(response_pred_plot$median.fit)
 max(response_pred_plot$uprS)
@@ -397,8 +398,8 @@ max(response_pred_plot$uprP)
 
 ggplot() +
   # plot the GAM
-  geom_ribbon(data = response_pred_plot, aes(x = Day, ymin = lwrS, 
-                                              ymax = uprS,
+  geom_ribbon(data = response_pred_plot, aes(x = Day, ymin = lwrP, 
+                                              ymax = uprP,
                                               color = Code_point_Libelle, 
                                               fill = Code_point_Libelle),
               linewidth = .75, alpha = .2) +
@@ -413,15 +414,14 @@ ggplot() +
   scale_color_discrete(type = pheno_palette4, guide = 'none') +
   scale_fill_discrete(type = pheno_palette4, guide = 'none') +
   facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
-  scale_y_continuous(limits = c(-1.5,15)) +
+  # scale_y_continuous(limits = c(-5,15)) +
   # cut the y scale at 22
-  #scale_y_continuous(limits = c(0,22)) +
   # Text
   labs(title = 'GAM of Chlorophyll a concentration (2016-2022)', x = 'Calendar day', 
        y = 'Pigment concentration (microgram/L)') +
   theme_classic()
 
-# Save the plot (even if it kinda looks like shit)
+# Save the plot (even if the model seems not ideal for MeR)
 # ggsave('Plots/GAMs/Pigments/GAM_chla_4sites.tiff', height = 150, width = 150,
 #        units = 'mm', dpi = 300, compression = 'lzw')
 
@@ -539,13 +539,13 @@ qqplot_custom <- ggplot(qq_data) +
   scale_color_discrete(type = pheno_palette4, guide = 'none') +
   theme_classic() +
   facet_wrap(facets = c('Code_point_Libelle')) +
-  labs(title = 'qq-plot for alloxanthin GAM', y="Sample Quantiles",
+  labs(title = 'qq-plot for alloxanthin GAM (2016-2022)', y="Sample Quantiles",
        x="Theoretical Quantiles")
 
 qqplot_custom
 
 # Save the plot
-# ggsave('qqplot_allox_4sites.tiff', dpi = 300, height = 175, width = 250,
+# ggsave('Plots/GAMs/Pigments/qqplot_allox_4sites.tiff', dpi = 300, height = 175, width = 250,
 #                units = 'mm', compression = 'lzw')
 
 # We can do the same for residuals vs fitted
@@ -555,30 +555,32 @@ RvFplot_custom <- ggplot(qq_data)+
   scale_color_discrete(type = pheno_palette4, guide = 'none') +
   theme_classic() +
   facet_wrap(facets = c('Code_point_Libelle'), scales = 'free') +
-  labs(title = 'Residuals vs fitted (alloxanthin GAM)',
+  labs(title = 'Residuals vs fitted - alloxanthin GAM (2016-2022)',
        y="Residuals", x="Fitted Values")
 
 RvFplot_custom
 # Not much structure : quite good
 
 # Save the plot
-# ggsave('RvFplot_allox_4sites.tiff', dpi = 300, height = 175, width = 250,
+# ggsave('Plots/GAMs/Pigments/RvFplot_allox_4sites.tiff', dpi = 300, height = 175, width = 250,
 #                units = 'mm', compression = 'lzw')
 
 # And let's do one last diagnostic plot with histogram of residuals
 HistRes_custom <- ggplot(qq_data, aes(x = Residuals, fill = Code_point_Libelle))+
-  geom_histogram(binwidth = 1)+
+  geom_histogram(binwidth = .4)+
   scale_fill_discrete(type = pheno_palette4, guide = 'none') +
   theme_classic() +
   facet_wrap(facets = c('Code_point_Libelle')) +
-  labs(title = 'Histogram of residuals (alloxanthin GAM)',
+  labs(title = 'Histogram of residuals - alloxanthin GAM
+(2016-2022)',
     x='Residuals', y = 'Count')
 
 HistRes_custom
-# Mostly centered on 0 -> nice
+# Mostly centered on 0 -> nice, still problems in MeR though (not unlike the
+# chl a GAM)
 
 # Save the plot
-# ggsave('HistRes_allox_4sites.tiff', dpi = 300, height = 175, width = 250,
+# ggsave('Plots/GAMs/Pigments/HistRes_allox_4sites.tiff', dpi = 300, height = 175, width = 250,
 #                units = 'mm', compression = 'lzw')
 
 ### Calculating confidence intervals ####
@@ -760,7 +762,7 @@ ggplot() +
        y = 'Pigment concentration (microgram/L)') +
   theme_classic()
 
-# ggsave('GAM_Allo.tiff', height = 164, width = 164,
+# ggsave('Plots/GAMs/Pigments/GAM_Allo_4sites.tiff', height = 164, width = 164,
 #                dpi = 300, unit = 'mm', compression = 'lzw')
 
 ### GAM of Alloxanthin/CHLOROA ratio ####
