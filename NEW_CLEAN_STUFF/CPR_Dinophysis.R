@@ -1,6 +1,6 @@
 ### CPR data for Dinophysis phenology ###
 
-# V. POCHIC, 2025-04-25
+# V. POCHIC, 2025-06-12
 
 # This script is made for plotting and analysing data from the CPR.
 
@@ -441,7 +441,7 @@ regions_id <- read.csv2('Data/CPR/CPR_regions_ids.csv', header = TRUE,
 
 ggplot() +
   # Plotting the tiles of longitude and latitude depending on Dinophysis presence
-  geom_rect(data = CPR_data_sum,
+  geom_rect(data = subset(CPR_data_sum, prop_pos<1),
             aes(xmin = lon.bin-.25, xmax = lon.bin+.25,
                 ymin = lat.bin-.25, ymax = lat.bin+.25, # width = .5, height = .5,
                 fill = log10(mean_Dino+1)*prop_pos*log10(nsamples+1))) +
@@ -464,14 +464,92 @@ ggplot() +
                      max(CPR_data$Latitude)))+
   # Labels
   labs(y = 'Latitude (degrees)', x = 'Longitude (degrees)',
-       title = "Dinophysis in the NE Atlantic (CPR data)", 
+       # title = "Dinophysis in the NE Atlantic (CPR data)", 
        fill = 'Dinophysis presence index')+
   theme_bw() +
   theme(legend.position = 'bottom')
 
 ## Save plot
-ggsave('CPR_Dinophysis_presence_regions2.tiff', height = 180, width = 164,
-       units = 'mm', dpi = 300, compression = 'lzw')
+# ggsave('CPR_Dinophysis_presence_regions2.tiff', height = 180, width = 164,
+#        units = 'mm', dpi = 300, compression = 'lzw')
+
+### The map for the common plot with REPHY data ####
+
+# Get the data for REPHY sampling sites
+# Import data for site coordinates
+Season_Dino <- read.csv2('Data/REPHY_outputs/Season_Dino_20250604.csv', header = TRUE, 
+                         fileEncoding = 'ISO-8859-1')
+
+# Summarise coordinates by site
+Table_sites <- Season_Dino %>%
+  group_by(Code_point_Libelle) %>%
+  summarise(# Longitude
+    Longitude.mean = mean(Longitude),
+    # Latitude
+    Latitude.mean = mean(Latitude),
+    .groups = 'keep') %>%
+  # Relevel sites to make them appear in the desired order
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Parc Leucate 2', 'Bouzigues (a)',
+                                          'Sète mer', 'Diana centre'))
+
+# Color palette for the REPHY sampling sites
+pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646',
+                     '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
+
+# COlor palette for the CPR-defined regions
+palette_regions4 <- c('orange1', 'royalblue2', 'red4', 'forestgreen')
+
+ggplot() +
+  # Plotting the tiles of longitude and latitude depending on Dinophysis presence
+  geom_rect(data = subset(CPR_data_sum, prop_pos<1),
+            aes(xmin = lon.bin-.25, xmax = lon.bin+.25,
+                ymin = lat.bin-.25, ymax = lat.bin+.25, # width = .5, height = .5,
+                fill = log10(mean_Dino+1)*prop_pos*log10(nsamples+1))) +
+  scale_fill_viridis() +
+  # Plotting the land
+  geom_polygon(data = Worldmap, aes(x = long, y = lat, group = group), 
+               fill = "grey80", color = 'gray10', linewidth = .25)+
+  # Plotting the limits of the regions
+  geom_polygon(data = regions_polygon, aes(x = lon, y = lat, group = region,
+                                           color = as_factor(region)), 
+               fill = "transparent", linewidth = 1) +
+  # Plotting the id of each region
+  geom_text(data = regions_id, aes(x = lon, y = lat, color = as_factor(region),
+                                   label = region), size = 6)+
+  scale_color_discrete(type = palette_regions4, guide = 'none') +
+  new_scale_color() +
+  
+  ### Plotting REPHY sampling sites
+  geom_point(data = Table_sites, aes(x = Longitude.mean, y = Latitude.mean, 
+                                     color = Code_point_Libelle), size = 2.5)+
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  
+  # Limits of the map
+  coord_fixed(xlim=c(-18,
+                     18), 
+              ylim=c(35,
+                     65),
+              ratio = 1.15)+
+  # Labels
+  labs(y = 'Latitude (degrees)', x = 'Longitude (degrees)',
+       # title = "Dinophysis in the NE Atlantic (CPR data)", 
+       fill = 'Dinophysis presence index')+
+  theme_bw() +
+  theme(legend.position = 'bottom')
+
+## Save plot
+# ggsave('Plots/CPR/CPR_REPHY_Dinophysis_map_composite.tiff', height = 200, width = 164,
+#        units = 'mm', dpi = 300, compression = 'lzw')
 
 # Plot the seasonality of Dinophysis depending on the region
 ggplot(data = subset(CPR_data_regions, region > 0)) +
@@ -554,44 +632,46 @@ by region',
   theme(legend.position = 'bottom')
 
 # Save that!
-# ggsave('CPR_Hovmoller_sampling.tiff', height = 150, width = 164, units = 'mm',
+# ggsave('Plots/CPR/CPR_Hovmoller_sampling.tiff', height = 150, width = 164, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
-### Then, Hovmoller diagram of mean Dinophysis abundance
+### Then, Hovmoller diagram of Dinophysis presence
 
 ggplot(data = subset(CPR_data_hovmoller, region > 0)) +
-  geom_tile(aes(x = Year, y = Month, fill = log10(mean_Dino+1))) +
-  scale_fill_viridis() +
+  geom_tile(aes(x = Year, y = Month, fill = log(prop_pos+1))) +
+  scale_fill_viridis(breaks = c(log(0+1), log(0.1+1), log(0.25+1), (log(0.5+1))),
+                     labels = c('0', '0.1', '0.25', '0.5')) +
   facet_wrap(facets = 'region') +
   scale_y_continuous(limits = c(0, 13), 
                      breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
-  labs(title = 'Dinophysis seasonality over the study period, 
-by region',
-       fill = 'Mean abundance of Dinophysis (log10)') +
+  labs(title = 'Dinophysis seasonality by region, CPR data',
+       fill = 'Dinophysis presence 
+(proportion of samples,
+log scale)') +
   theme_classic() +
   theme(legend.position = 'bottom')
 
 # Save that!
-# ggsave('CPR_Hovmoller_abundance.tiff', height = 150, width = 164, units = 'mm',
+# ggsave('Plots/CPR/CPR_Hovmoller_proportion_4regions.tiff', height = 125, width = 164, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
-### Then, Hovmoller diagram of Dinophysis presence index
+### Then, Hovmoller diagram of Dinophysis abundance
 
 ggplot(data = subset(CPR_data_hovmoller, region > 0)) +
   geom_tile(aes(x = Year, y = Month, 
-                fill = log10(mean_Dino+1)*prop_pos*log10(nsamples+1))) +
+                fill = log10(mean_Dino+1))) +
   scale_fill_viridis() +
   facet_wrap(facets = 'region') +
   scale_y_continuous(limits = c(0, 13), 
                      breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
   labs(title = 'Dinophysis seasonality over the study period, 
 by region',
-       fill = 'Dinophysis presence index') +
+       fill = 'Mean Dinophysis abundance (log10)') +
   theme_classic() +
   theme(legend.position = 'bottom')
 
 # Save that!
-# ggsave('CPR_Hovmoller_DPI.tiff', height = 150, width = 164, units = 'mm',
+# ggsave('Plots/CPR/CPR_Hovmoller_abundance.tiff', height = 150, width = 164, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
 ### Hovmoller diagrams by fortnight (does not work well) ####

@@ -1,6 +1,6 @@
 ###### Dinophysis phenology: visualisations on multiple years ###
 ## V. POCHIC
-# 2025-03-31
+# 2025-06-12
 
 # Additional visualisations using the results of GAM, REPHY data and satellite
 # observations, to observe Dinophysis dynamics over several years
@@ -9,6 +9,7 @@
 library(tidyverse)
 library(ggplot2)
 library(ggnewscale)
+library(viridis)
 library(cmocean)
 library(RColorBrewer)
 
@@ -288,6 +289,227 @@ ggplot(data = subset(Maxima_Dino_2,
 # ggsave('Maxima_plot2_8sites.tiff', dpi = 300, height = 125, width = 164,
 #                units = 'mm', compression = 'lzw')
 
+
+#### Hovmoller diagrams ####
+
+# We'll try to plot Hovmoller diagrams of Dinophysis presence for our sites, 
+# to have a point of comparison with the CPR data analysis.
+
+Season_Dino_monthly <- Season_Dino %>%
+  group_by(Year, Month, Code_point_Libelle) %>%
+  # Create a dummy variable for Dinophysis presence
+  mutate(Dinodummy = ifelse(Dinophysis_genus > 0, 1, 0)) %>%
+  # Summarise as desired values
+  summarise(mean_Dino = mean(Dinophysis_genus),
+            # Total sum of Dinophysis counted
+            sumDino = sum(Dinophysis_genus),
+            # Number of samples with Dinophysis
+            nsamples_Dino = sum(Dinodummy),
+            # Total number of samples
+            nsamples = n(),
+            .groups = 'keep') %>%
+  # Compute the proportion of Dinophysis
+  mutate(prop_pos = nsamples_Dino/nsamples) %>%
+  # reorder the sampling site variable
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Parc Leucate 2', 'Bouzigues (a)',
+                                          'Sète mer', 'Diana centre'))
+
+## Plots
+
+# Hovmoller diagram of sampling effort
+ggplot(data = subset(Season_Dino_monthly, Code_point_Libelle != 0)) +
+  geom_tile(aes(x = Year, y = Month, fill = as_factor(nsamples))) +
+  scale_fill_viridis(option = 'plasma', discrete = TRUE) +
+  facet_wrap(facets = 'Code_point_Libelle') +
+  scale_y_continuous(limits = c(0, 13), 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  labs(title = 'Sampling effort over the study period,
+by sampling site',
+       fill = 'Number of samples (log10)') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# Save plot
+# ggsave('Plots/REPHY/REPHY_Hovmoller_sampling.tiff', height = 225, width = 250, units = 'mm',
+#        dpi = 300, compression = 'lzw')
+
+### Then, Hovmoller diagram of Dinophysis presence
+
+ggplot(data = subset(Season_Dino_monthly, Code_point_Libelle != 0)) +
+  geom_tile(aes(x = Year, y = Month, fill = log(prop_pos+1))) +
+  scale_fill_viridis() +
+  facet_wrap(facets = 'Code_point_Libelle') +
+  scale_y_continuous(limits = c(0, 13), 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  labs(title = 'Dinophysis seasonality over the study period, 
+by sampling site',
+       fill = 'Dinophysis presence 
+(proportion of samples, log scale)') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# This one's pretty awful.
+# ggsave('Plots/REPHY/REPHY_Hovmoller_proportion.tiff', height = 225, width = 250, units = 'mm',
+#        dpi = 300, compression = 'lzw')
+
+### Finally, Hovmoller diagram of Dinophysis abundance
+
+ggplot(data = subset(Season_Dino_monthly, Code_point_Libelle != 0)) +
+  geom_tile(aes(x = Year, y = Month, fill = log10(mean_Dino+1))) +
+  scale_fill_viridis() +
+  facet_wrap(facets = 'Code_point_Libelle') +
+  scale_y_continuous(limits = c(0, 13), 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  labs(title = 'Dinophysis seasonality over the study period, 
+by sampling site',
+       fill = 'Mean Dinophysis abundance (log10)') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# This one's a bit better but still not great.
+# ggsave('Plots/REPHY/REPHY_Hovmoller_abundance.tiff', height = 225, width = 250, units = 'mm',
+#        dpi = 300, compression = 'lzw')
+
+## Hovmoller diagrams - CPR timeline ####
+
+# We elongate the x-axis so we have the same time range than the CPR data
+
+# Antifer
+ggplot(data = subset(Season_Dino_monthly, Code_point_Libelle == 'Antifer ponton pétrolier')) +
+  geom_tile(aes(x = Year, y = Month, fill = log10(mean_Dino+1))) +
+  scale_fill_viridis() +
+  scale_x_continuous(limits = c(1958, 2023), 
+                     breaks = c(1960, 2000, 2007, 2020)) +
+  scale_y_continuous(limits = c(0, 13), 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  labs(title = 'Antifer ponton pétrolier',
+       fill = 'Mean Dinophysis abundance (log10)') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# Cabourg
+ggplot(data = subset(Season_Dino_monthly, Code_point_Libelle == 'Cabourg')) +
+  geom_tile(aes(x = Year, y = Month, fill = log10(mean_Dino+1))) +
+  scale_fill_viridis() +
+  scale_x_continuous(limits = c(1958, 2023), 
+                     breaks = c(1960, 2000, 2010, 2020)) +
+  scale_y_continuous(limits = c(0, 13), 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  labs(title = 'Cabourg',
+       fill = 'Mean Dinophysis abundance (log10)') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# Men er Roue
+ggplot(data = subset(Season_Dino_monthly, Code_point_Libelle == 'Men er Roue')) +
+  geom_tile(aes(x = Year, y = Month, fill = log10(mean_Dino+1))) +
+  scale_fill_viridis() +
+  scale_x_continuous(limits = c(1958, 2023), 
+                     breaks = c(1960, 2000, 2010, 2020)) +
+  scale_y_continuous(limits = c(0, 13), 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  labs(title = 'Men er Roue',
+       fill = 'Mean Dinophysis abundance (log10)') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# Ouest Loscolo
+ggplot(data = subset(Season_Dino_monthly, Code_point_Libelle == 'Ouest Loscolo')) +
+  geom_tile(aes(x = Year, y = Month, fill = log10(mean_Dino+1))) +
+  scale_fill_viridis() +
+  scale_x_continuous(limits = c(1958, 2023), 
+                     breaks = c(1960, 2000, 2010, 2020)) +
+  scale_y_continuous(limits = c(0, 13), 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  labs(title = 'Ouest Loscolo',
+       fill = 'Mean Dinophysis abundance (log10)') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+## That's all very nice, let's group them by region to obtain a broader picture
+
+Season_Dino_region <- Season_Dino %>%
+  group_by(Year, Month, Code.Region) %>%
+  # Correct an error in the Code.Region
+  mutate(Code.Region = ifelse(Code_point_Libelle == 'Ouest Loscolo',
+                              21,
+                              Code.Region)) %>%
+  # Create a dummy variable for Dinophysis presence
+  mutate(Dinodummy = ifelse(Dinophysis_genus > 0, 1, 0)) %>%
+  # Summarise as desired values
+  summarise(mean_Dino = mean(Dinophysis_genus),
+            # Total sum of Dinophysis counted
+            sumDino = sum(Dinophysis_genus),
+            # Number of samples with Dinophysis
+            nsamples_Dino = sum(Dinodummy),
+            # Total number of samples
+            nsamples = n(),
+            .groups = 'keep') %>%
+  # Compute the proportion of Dinophysis
+  mutate(prop_pos = nsamples_Dino/nsamples) %>%
+  # Add the name of regions
+  mutate(Region_name = ifelse(
+    Code.Region == 11, 'Pas de Calais',
+    ifelse(Code.Region == 12, 'Seine Bay',
+           ifelse(Code.Region == 13, 'Western Channel',
+                  ifelse(Code.Region == 21, 'Southern Brittany',
+                         ifelse(Code.Region == 22, 'Pertuis',
+                                ifelse(Code.Region == 23, 'Arcachon',
+                                       ifelse(Code.Region == 31, 'Golfe du Lion',
+                                              'Corsica'))))))
+  )) %>%
+  # And recode it as factor
+  mutate(Region_name = as_factor(Region_name)) %>%
+  mutate(Region_name = fct_relevel(Region_name,
+                                   'Pas de Calais', 'Seine Bay', 'Western Channel',
+                                   'Southern Brittany', 'Pertuis', 'Arcachon',
+                                   'Golfe du Lion', 'Corsica'))
+
+# Hovmoller diagram : all regions
+ggplot(data = Season_Dino_region) +
+  geom_tile(aes(x = Year, y = Month, fill = log10(mean_Dino+1))) +
+  scale_fill_viridis(breaks = c(log10(0+1), log10(10+1), log10(100+1),
+                                log10(1000+1)), labels = c('0','10','100','1000')) +
+  scale_x_continuous(limits = c(1958, 2023), 
+                     breaks = c(1960, 2007, 2020)) +
+  scale_y_continuous(limits = c(0, 13), 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  facet_wrap(facets = 'Region_name') +
+  labs(title = 'Dinophysis seasonality, REPHY data',
+       fill = 'Mean Dinophysis abundance (log10)') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# save plot
+# ggsave('Plots/REPHY/Hovmoller_abundance_all.tiff', height = 150, width = 164,
+#        units = 'mm', compression = 'lzw')
+
+# Only Atlantic regions
+ggplot(data = subset(Season_Dino_region, Code.Region < 30)) +
+  geom_tile(aes(x = Year, y = Month, fill = log10(mean_Dino+1))) +
+  scale_fill_viridis(breaks = c(log10(0+1), log10(10+1), log10(100+1),
+                                log10(1000+1)), labels = c('0','10','100','1000')) +
+  scale_x_continuous(limits = c(1958, 2023), 
+                     breaks = c(1960, 2007, 2020)) +
+  scale_y_continuous(limits = c(0, 13), 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  facet_wrap(facets = 'Region_name') +
+  labs(title = 'Dinophysis seasonality, REPHY data',
+       fill = 'Mean Dinophysis abundance (log10)') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# save plot
+# ggsave('Plots/REPHY/Hovmoller_abundance_atlantic.tiff', height = 125, width = 164,
+#        units = 'mm', compression = 'lzw')
 
 ### Environmental data ####
 
