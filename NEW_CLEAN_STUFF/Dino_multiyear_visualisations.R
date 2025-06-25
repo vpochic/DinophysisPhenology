@@ -1,6 +1,6 @@
 ###### Dinophysis phenology: visualisations on multiple years ###
 ## V. POCHIC
-# 2025-06-12
+# 2025-06-25
 
 # Additional visualisations using the results of GAM, REPHY data and satellite
 # observations, to observe Dinophysis dynamics over several years
@@ -200,7 +200,9 @@ Maxima_Dino_2 <- Season_Dino_nozeros %>%
                                           'Le Cornard', 'Auger',
                                           'Arcachon - Bouée 7', 'Teychan bis',
                                           'Parc Leucate 2', 'Bouzigues (a)',
-                                          'Sète mer', 'Diana centre'))
+                                          'Sète mer', 'Diana centre')) %>%
+# Keep only Dinophysis cell densities >= X00 cells/L (more than X cells counted)
+filter(true_count >= 3)
 
 # GAM fit
 GAM_peak_select2 <- GAM_peak_select %>%
@@ -286,7 +288,7 @@ ggplot(data = subset(Maxima_Dino_2,
   theme_classic()
 
 # That's even doper
-# ggsave('Maxima_plot2_8sites.tiff', dpi = 300, height = 125, width = 164,
+# ggsave('Plots/REPHY/Maxima_plot2_8sites_3.tiff', dpi = 300, height = 125, width = 164,
 #                units = 'mm', compression = 'lzw')
 
 
