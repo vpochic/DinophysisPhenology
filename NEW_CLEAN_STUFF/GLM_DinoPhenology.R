@@ -18,6 +18,7 @@
 library(tidymodels)
 library(tidyverse)
 library(vip)
+library(mgcv)
 library(ranger)
 library(DescTools)
 library(viridis)
@@ -307,3 +308,640 @@ ggplot(data = Table_data_RF_multiyear,
   theme_classic()
 
 # This seems pretty fckin difficult
+# Can we try to model it with a GAM? (non-linear relationship)
+
+# We'll do this with the 10 sites we used for the random forest (Teychan and 
+# Auger excluded)
+
+Table_GAM <- Table_data_RF_multiyear %>%
+  filter(is.na(TEMP) == FALSE) %>%
+  filter(Code_point_Libelle != 'Teychan bis' & 
+           Code_point_Libelle != 'Auger')
+
+gam_Dino <- gam(data = Table_GAM, 
+                # Only a spline for the temperature
+                # 'k = -1' allows the model to fix the 'best' number of basic
+                # functions (= knots)
+                formula = .derivative~s(TEMP, k = -1),
+                # Introducing the weights
+                # weights = unif_weight,
+                # Using a Poisson distribution for count data
+                family = gaussian(),
+                # Restricted maximum likelihood estimation (recommended method)
+                method = 'REML')
+
+summary(gam_Dino)
+gam.check(gam_Dino)
+
+# Create a new 'empty' dataset for storing model prediction (fit)
+gam_Dino_newdata <- expand_grid(TEMP=seq(min(Table_GAM$TEMP),
+                                         max(Table_GAM$TEMP)))
+
+## Get the inverse link function of the model
+# With this function, we can transform the prediction we make on the link
+#scale to the response scale
+ilink <- gam_Dino$family$linkinv
+
+## Predict : add fit and se.fit on the **link** scale
+gam_Dino_newdata <- bind_cols(gam_Dino_newdata, 
+                              setNames(as_tibble(
+                                predict(gam_Dino, gam_Dino_newdata, 
+                                        se.fit = TRUE, type = 'link')[1:2]),
+                                c('fit_link','se_link')))
+
+## Create the 95% confidence interval (2*standard error fit) and backtransform 
+# to response variable using the inverse link function
+gam_Dino_newdata <- mutate(gam_Dino_newdata,
+                           fit_resp  = ilink(fit_link),
+                           right_upr = ilink(fit_link + (2 * se_link)),
+                           right_lwr = ilink(fit_link - (2 * se_link)))
+# Check the confidence interval. It should not extend below 0 (negative counts
+# are impossible)
+min(gam_Dino_newdata$right_lwr) # Nice :)
+min(gam_Dino_newdata$fit_resp)
+max(gam_Dino_newdata$right_upr) # Nice too
+max(gam_Dino_newdata$fit_resp)
+# The maximum value seems really small
+
+# Saving data to make another plot in another script
+# write.csv2(gam_Dino_newdata, 'gam_Dino_multiyear_data.csv', row.names = FALSE,
+#            fileEncoding = 'ISO-8859-1')
+
+### Checking the model
+ModelOutputs<-data.frame(Fitted=fitted(gam_Dino),
+                         Residuals=resid(gam_Dino))
+
+# We're gonna make our own qq plot with colors identifying sites
+# We base it on the structure of the model
+qq_data <- gam_Dino$model
+# then we add the values of fitted and residuals 
+# (but are they in the same order as the model? -> need to check that)
+qq_data <- bind_cols(qq_data, ModelOutputs)
+
+# Plot : verify that true data matches (more or less) model fit
+ggplot(qq_data)+
+  geom_point(aes(x = TEMP, y = .derivative), color = 'red') +
+  geom_point(aes(x = TEMP, y = Fitted), color = 'blue') +
+  theme_classic() +
+  labs(y = "Dinophysis derivative", x = "TEMP")
+
+# The data is almost symmetrical around 0, the fit is therefore near a perfect 0
+
+# Custom qq-plot
+qqplot_custom <- ggplot(qq_data) +
+  stat_qq(aes(sample=Residuals), color = 'red3', alpha = .7) +
+  stat_qq_line(aes(sample=Residuals), color = 'black') +
+  theme_classic() +
+  labs(y="Sample Quantiles",x="Theoretical Quantiles",
+       title = 'qq-plot: GAM of Dinophysis derivative ~ SST')
+
+qqplot_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/qqplot_custom_GAM_TEMP.tiff', dpi = 300, height = 164, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# We can do the same for residuals vs fitted
+RvFplot_custom <- ggplot(qq_data)+
+  geom_point(aes(x=Fitted, y=Residuals), 
+             alpha = .7, color = 'red3') +
+  theme_classic() +
+  labs(y="Residuals",x="Fitted Values",
+       title = 'Residuals vs Fitted: 
+GAM of Dinophysis derivative ~ SST')
+
+RvFplot_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/RvFplot_custom_GAM_TEMP.tiff', dpi = 300, height = 120, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# And let's do one last diagnostic plot with histogram of residuals
+HistRes_custom <- ggplot(qq_data, aes(x = Residuals)) +
+  geom_histogram(binwidth = .005, fill = 'red3') +
+  theme_classic() +
+  labs(x='Residuals', y = 'Count',
+       title = 'Histogram of residuals: 
+GAM of Dinophysis derivative ~ SST')
+
+HistRes_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/HistRes_custom_GAM_TEMP.tiff', dpi = 300, height = 164, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# Plot the model against the data
+ggplot(data = gam_Dino_newdata,
+       aes(x = TEMP, y = fit_resp)) +
+  geom_line(color = 'red3', linewidth = .5) +
+  geom_ribbon(aes(x = TEMP,
+                  ymin = right_lwr, 
+                  ymax = right_upr), fill = 'red3', color = 'red3', alpha = .2) +
+  geom_point(data = Table_GAM, aes(x = TEMP, y = .derivative), size = .8, 
+             alpha = .5, color = 'red3') +
+  labs(x = 'Sea Surface Temperature (°C)', 
+       y = 'Dinophysis accumulation rate (d-1)',
+       title = 'GAM fit: Dinophysis derivative ~ SST') +
+  theme_classic()
+
+# Save this plot
+# ggsave('Plots/GAMs/Drivers/GAM_fit_SST.tiff', height = 135, width = 164,
+#        units = 'mm', compression = 'lzw')
+
+## Surface solar radiation ####
+
+# Let's plot the data
+ggplot(data = Table_data_RF_multiyear,
+       aes(x = ssr, y = .derivative, color = Code_point_Libelle)) +
+  # Points
+  geom_point(size = 2, alpha = .7) +
+  # Add 2 "ghost points" to force the minimum y-axis range to -0.1;0.1
+  geom_point(aes(x = 10, y = -.1), color = 'transparent', fill = 'transparent') +
+  geom_point(aes(x = 10, y = .1), color = 'transparent', fill = 'transparent') +
+  # Color scale (sampling sites)
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  # New color scale for ssrerature rug plot
+  new_scale_color() +
+  geom_rug(data = Table_data_RF_multiyear, aes(x = ssr, y = NULL,
+                                               color = ssr)) +
+  scale_color_distiller(palette = 'RdBu', direction = -1, guide = 'none') +
+  # facets
+  facet_wrap(facets = 'Code_point_Libelle', scales = 'free') +
+  # Labels
+  labs(x = 'Surface Solar Radiation', y = 'GAM derivative',) +
+  # Theme
+  theme_classic()
+
+# Looks pretty damn clear that there is no relationship.
+# Let's check with a GAM
+
+# We'll do this with the 10 sites we used for the random forest (Teychan and 
+# Auger excluded)
+
+Table_GAM <- Table_data_RF_multiyear %>%
+  filter(is.na(ssr) == FALSE) %>%
+  filter(Code_point_Libelle != 'Teychan bis' & 
+           Code_point_Libelle != 'Auger')
+
+gam_Dino <- gam(data = Table_GAM, 
+                # Only a spline for the ssrerature
+                # 'k = -1' allows the model to fix the 'best' number of basic
+                # functions (= knots)
+                formula = .derivative~s(ssr, k = -1),
+                # Introducing the weights
+                # weights = unif_weight,
+                # Using a Poisson distribution for count data
+                family = gaussian(),
+                # Restricted maximum likelihood estimation (recommended method)
+                method = 'REML')
+
+summary(gam_Dino)
+gam.check(gam_Dino)
+
+# Create a new 'empty' dataset for storing model prediction (fit)
+gam_Dino_newdata <- expand_grid(ssr=seq(min(Table_GAM$ssr),
+                                         max(Table_GAM$ssr)))
+
+## Get the inverse link function of the model
+# With this function, we can transform the prediction we make on the link
+#scale to the response scale
+ilink <- gam_Dino$family$linkinv
+
+## Predict : add fit and se.fit on the **link** scale
+gam_Dino_newdata <- bind_cols(gam_Dino_newdata, 
+                              setNames(as_tibble(
+                                predict(gam_Dino, gam_Dino_newdata, 
+                                        se.fit = TRUE, type = 'link')[1:2]),
+                                c('fit_link','se_link')))
+
+## Create the 95% confidence interval (2*standard error fit) and backtransform 
+# to response variable using the inverse link function
+gam_Dino_newdata <- mutate(gam_Dino_newdata,
+                           fit_resp  = ilink(fit_link),
+                           right_upr = ilink(fit_link + (2 * se_link)),
+                           right_lwr = ilink(fit_link - (2 * se_link)))
+# Check the confidence interval. It should not extend below 0 (negative counts
+# are impossible)
+min(gam_Dino_newdata$right_lwr) # Nice :)
+min(gam_Dino_newdata$fit_resp)
+max(gam_Dino_newdata$right_upr) # Nice too
+max(gam_Dino_newdata$fit_resp)
+# The maximum value seems really small
+
+### Checking the model
+ModelOutputs<-data.frame(Fitted=fitted(gam_Dino),
+                         Residuals=resid(gam_Dino))
+
+# We're gonna make our own qq plot with colors identifying sites
+# We base it on the structure of the model
+qq_data <- gam_Dino$model
+# then we add the values of fitted and residuals 
+# (but are they in the same order as the model? -> need to check that)
+qq_data <- bind_cols(qq_data, ModelOutputs)
+
+# Plot : verify that true data matches (more or less) model fit
+ggplot(qq_data)+
+  geom_point(aes(x = ssr, y = .derivative), color = 'red') +
+  geom_point(aes(x = ssr, y = Fitted), color = 'blue') +
+  theme_classic() +
+  labs(y = "Dinophysis derivative", x = "ssr")
+
+# The data is almost symmetrical around 0, the fit is therefore near a perfect 0
+
+# Custom qq-plot
+qqplot_custom <- ggplot(qq_data) +
+  stat_qq(aes(sample=Residuals), color = '#FBA823', alpha = .7) +
+  stat_qq_line(aes(sample=Residuals), color = 'black') +
+  theme_classic() +
+  labs(y="Sample Quantiles",x="Theoretical Quantiles",
+       title = 'qq-plot: GAM of Dinophysis derivative ~ SSR')
+
+qqplot_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/qqplot_custom_GAM_ssr.tiff', dpi = 300, height = 164, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# We can do the same for residuals vs fitted
+RvFplot_custom <- ggplot(qq_data)+
+  geom_point(aes(x=Fitted, y=Residuals), 
+             alpha = .7, color = '#FBA823') +
+  theme_classic() +
+  labs(y="Residuals",x="Fitted Values",
+       title = 'Residuals vs Fitted: 
+GAM of Dinophysis derivative ~ SSR')
+
+RvFplot_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/RvFplot_custom_GAM_ssr.tiff', dpi = 300, height = 120, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# And let's do one last diagnostic plot with histogram of residuals
+HistRes_custom <- ggplot(qq_data, aes(x = Residuals)) +
+  geom_histogram(binwidth = .005, fill = '#FBA823') +
+  theme_classic() +
+  labs(x='Residuals', y = 'Count',
+       title = 'Histogram of residuals: 
+GAM of Dinophysis derivative ~ SSR')
+
+HistRes_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/HistRes_custom_GAM_ssr.tiff', dpi = 300, height = 164, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# Plot the model against the data
+ggplot(data = gam_Dino_newdata,
+       aes(x = ssr, y = fit_resp)) +
+  geom_line(color = '#FBA823', linewidth = .5) +
+  geom_ribbon(aes(x = ssr,
+                  ymin = right_lwr, 
+                  ymax = right_upr), fill = '#FBA823', color = '#FBA823', alpha = .2) +
+  geom_point(data = Table_GAM, aes(x = ssr, y = .derivative), size = .8, 
+             alpha = .5, color = '#FBA823') +
+  labs(x = 'Surface Solar Radiation', 
+       y = 'Dinophysis accumulation rate (d-1)',
+       title = 'GAM fit: Dinophysis derivative ~ SSR') +
+  theme_classic()
+
+# Save this plot
+# ggsave('Plots/GAMs/Drivers/GAM_fit_SSR.tiff', height = 135, width = 164,
+#        units = 'mm', compression = 'lzw')
+
+## Stratification Index ####
+
+# Let's plot the data
+ggplot(data = Table_data_RF_multiyear,
+       aes(x = Stratification_Index, y = .derivative, color = Code_point_Libelle)) +
+  # Points
+  geom_point(size = 2, alpha = .7) +
+  # Add 2 "ghost points" to force the minimum y-axis range to -0.1;0.1
+  geom_point(aes(x = 0, y = -.1), color = 'transparent', fill = 'transparent') +
+  geom_point(aes(x = 0, y = .1), color = 'transparent', fill = 'transparent') +
+  # Color scale (sampling sites)
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  # New color scale for Stratification_Indexerature rug plot
+  new_scale_color() +
+  # geom_rug(data = Table_data_RF_multiyear, aes(x = Stratification_Index, y = NULL,
+  #                                              color = Stratification_Index)) +
+  scale_color_distiller(palette = 'RdBu', direction = -1, guide = 'none') +
+  # facets
+  facet_wrap(facets = 'Code_point_Libelle', scales = 'free_y') +
+  # Labels
+  labs(x = 'Stratification Index', y = 'GAM derivative',) +
+  # Theme
+  theme_classic()
+
+# This one's a bit more tricky.
+# Let's check with a GAM
+
+# We'll do this with the 10 sites we used for the random forest (Teychan and 
+# Auger excluded)
+
+Table_GAM <- Table_data_RF_multiyear %>%
+  filter(is.na(Stratification_Index) == FALSE) %>%
+  filter(Code_point_Libelle != 'Teychan bis' & 
+           Code_point_Libelle != 'Auger')
+
+gam_Dino <- gam(data = Table_GAM, 
+                # Only a spline for the Stratification_Indexerature
+                # 'k = -1' allows the model to fix the 'best' number of basic
+                # functions (= knots)
+                formula = .derivative~s(Stratification_Index, k = -1),
+                # Introducing the weights
+                # weights = unif_weight,
+                # Using a Poisson distribution for count data
+                family = gaussian(),
+                # Restricted maximum likelihood estimation (recommended method)
+                method = 'REML')
+
+summary(gam_Dino)
+gam.check(gam_Dino)
+
+# Create a new 'empty' dataset for storing model prediction (fit)
+gam_Dino_newdata <- expand_grid(Stratification_Index=seq(min(Table_GAM$Stratification_Index),
+                                        max(Table_GAM$Stratification_Index), length.out = 300))
+
+## Get the inverse link function of the model
+# With this function, we can transform the prediction we make on the link
+#scale to the response scale
+ilink <- gam_Dino$family$linkinv
+
+## Predict : add fit and se.fit on the **link** scale
+gam_Dino_newdata <- bind_cols(gam_Dino_newdata, 
+                              setNames(as_tibble(
+                                predict(gam_Dino, gam_Dino_newdata, 
+                                        se.fit = TRUE, type = 'link')[1:2]),
+                                c('fit_link','se_link')))
+
+## Create the 95% confidence interval (2*standard error fit) and backtransform 
+# to response variable using the inverse link function
+gam_Dino_newdata <- mutate(gam_Dino_newdata,
+                           fit_resp  = ilink(fit_link),
+                           right_upr = ilink(fit_link + (2 * se_link)),
+                           right_lwr = ilink(fit_link - (2 * se_link)))
+# Check the confidence interval. It should not extend below 0 (negative counts
+# are impossible)
+min(gam_Dino_newdata$right_lwr) # Nice :)
+min(gam_Dino_newdata$fit_resp)
+max(gam_Dino_newdata$right_upr) # Nice too
+max(gam_Dino_newdata$fit_resp)
+# The maximum value seems really small
+
+### Checking the model
+ModelOutputs<-data.frame(Fitted=fitted(gam_Dino),
+                         Residuals=resid(gam_Dino))
+
+# We're gonna make our own qq plot with colors identifying sites
+# We base it on the structure of the model
+qq_data <- gam_Dino$model
+# then we add the values of fitted and residuals 
+# (but are they in the same order as the model? -> need to check that)
+qq_data <- bind_cols(qq_data, ModelOutputs)
+
+# Plot : verify that true data matches (more or less) model fit
+ggplot(qq_data)+
+  geom_point(aes(x = Stratification_Index, y = .derivative), color = 'red') +
+  geom_point(aes(x = Stratification_Index, y = Fitted), color = 'blue') +
+  theme_classic() +
+  labs(y = "Dinophysis derivative", x = "Stratification_Index")
+
+# The data is almost symmetrical around 0, the fit is therefore near a perfect 0
+
+# Custom qq-plot
+qqplot_custom <- ggplot(qq_data) +
+  stat_qq(aes(sample=Residuals), color = '#377185', alpha = .7) +
+  stat_qq_line(aes(sample=Residuals), color = 'black') +
+  theme_classic() +
+  labs(y="Sample Quantiles",x="Theoretical Quantiles",
+       title = 'qq-plot: 
+GAM of Dino derivative ~ Stratification Index')
+
+qqplot_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/qqplot_custom_GAM_Stratification_Index.tiff', dpi = 300, height = 164, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# We can do the same for residuals vs fitted
+RvFplot_custom <- ggplot(qq_data)+
+  geom_point(aes(x=Fitted, y=Residuals), 
+             alpha = .7, color = '#377185') +
+  theme_classic() +
+  labs(y="Residuals",x="Fitted Values",
+       title = 'Residuals vs Fitted: 
+GAM of Dinophysis derivative ~ Stratification Index')
+
+RvFplot_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/RvFplot_custom_GAM_Stratification_Index.tiff', dpi = 300, height = 120, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# And let's do one last diagnostic plot with histogram of residuals
+HistRes_custom <- ggplot(qq_data, aes(x = Residuals)) +
+  geom_histogram(binwidth = .005, fill = '#377185') +
+  theme_classic() +
+  labs(x='Residuals', y = 'Count',
+       title = 'Histogram of residuals: 
+GAM of Dinophysis derivative ~ Stratification_Index')
+
+HistRes_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/HistRes_custom_GAM_Stratification_Index.tiff', dpi = 300, height = 164, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# Plot the model against the data
+ggplot(data = gam_Dino_newdata,
+       aes(x = Stratification_Index, y = fit_resp)) +
+  geom_line(color = '#377185', linewidth = .5) +
+  geom_ribbon(aes(x = Stratification_Index,
+                  ymin = right_lwr, 
+                  ymax = right_upr), fill = '#377185', color = '#377185', alpha = .2) +
+  geom_point(data = Table_GAM, aes(x = Stratification_Index, y = .derivative), size = .8, 
+             alpha = .5, color = '#377185') +
+  labs(x = 'Surface Solar Radiation', 
+       y = 'Dinophysis accumulation rate (d-1)',
+       title = 'GAM fit: Dinophysis derivative ~ Stratification_Index') +
+  theme_classic()
+
+# Save this plot
+# ggsave('Plots/GAMs/Drivers/GAM_fit_Stratification_Index.tiff', height = 135, width = 164,
+#        units = 'mm', compression = 'lzw')
+
+## NO3 + NO2 ####
+
+# Now we're gonna check the variables of our second random forest (the one with
+# only 4 sites and 7 years)
+
+# We'll start with the most important variables (as given by the VIP analysis) :
+#NO3 + NO2
+
+# Restrict our dataset
+Table_GAM <- Table_data_RF_multiyear %>%
+  filter(Code_point_Libelle %in% c('Antifer ponton pétrolier', 'Cabourg',
+                                   'Men er Roue', 'Ouest Loscolo')) %>%
+  filter(Year >= 2016 & Year <= 2022)
+
+# New color palette
+pheno_palette4 <- c('red3', 'orangered', '#2156A1', '#5995E3')
+
+# Let's plot the data
+ggplot(data = Table_GAM,
+       aes(x = NO3.NO2, y = .derivative, color = Code_point_Libelle)) +
+  # Points
+  geom_point(size = 2, alpha = .7) +
+  # Add 2 "ghost points" to force the minimum y-axis range to -0.1;0.1
+  geom_point(aes(x = 0, y = -.1), color = 'transparent', fill = 'transparent') +
+  geom_point(aes(x = 0, y = .1), color = 'transparent', fill = 'transparent') +
+  # Color scale (sampling sites)
+  scale_color_discrete(type = pheno_palette4, guide = 'none') +
+  # New color scale for NO3.NO2erature rug plot
+  new_scale_color() +
+  # geom_rug(data = Table_data_RF_multiyear, aes(x = NO3.NO2, y = NULL,
+  #                                              color = NO3.NO2)) +
+  scale_color_distiller(palette = 'RdBu', direction = -1, guide = 'none') +
+  # facets
+  facet_wrap(facets = 'Code_point_Libelle', scales = 'free_y') +
+  # Labels
+  labs(x = 'N03 + NO2 (µmol.L-1)', y = 'GAM derivative',) +
+  # Theme
+  theme_classic()
+
+# Once again, close to no signal.
+# Let's check with a GAM
+
+# We'll do this with the 10 sites we used for the random forest (Teychan and 
+# Auger excluded)
+
+Table_GAM <- Table_GAM %>%
+  filter(is.na(NO3.NO2) == FALSE)
+
+gam_Dino <- gam(data = Table_GAM, 
+                # Only a spline for the NO3.NO2erature
+                # 'k = -1' allows the model to fix the 'best' number of basic
+                # functions (= knots)
+                formula = .derivative~s(NO3.NO2, k = -1),
+                # Introducing the weights
+                # weights = unif_weight,
+                # Using a Poisson distribution for count data
+                family = gaussian(),
+                # Restricted maximum likelihood estimation (recommended method)
+                method = 'REML')
+
+summary(gam_Dino)
+gam.check(gam_Dino)
+
+# Create a new 'empty' dataset for storing model prediction (fit)
+gam_Dino_newdata <- expand_grid(NO3.NO2=seq(min(Table_GAM$NO3.NO2),
+                                                         max(Table_GAM$NO3.NO2), length.out = 300))
+
+## Get the inverse link function of the model
+# With this function, we can transform the prediction we make on the link
+#scale to the response scale
+ilink <- gam_Dino$family$linkinv
+
+## Predict : add fit and se.fit on the **link** scale
+gam_Dino_newdata <- bind_cols(gam_Dino_newdata, 
+                              setNames(as_tibble(
+                                predict(gam_Dino, gam_Dino_newdata, 
+                                        se.fit = TRUE, type = 'link')[1:2]),
+                                c('fit_link','se_link')))
+
+## Create the 95% confidence interval (2*standard error fit) and backtransform 
+# to response variable using the inverse link function
+gam_Dino_newdata <- mutate(gam_Dino_newdata,
+                           fit_resp  = ilink(fit_link),
+                           right_upr = ilink(fit_link + (2 * se_link)),
+                           right_lwr = ilink(fit_link - (2 * se_link)))
+# Check the confidence interval. It should not extend below 0 (negative counts
+# are impossible)
+min(gam_Dino_newdata$right_lwr) # Nice :)
+min(gam_Dino_newdata$fit_resp)
+max(gam_Dino_newdata$right_upr) # Nice too
+max(gam_Dino_newdata$fit_resp)
+# The maximum value seems really small
+
+### Checking the model
+ModelOutputs<-data.frame(Fitted=fitted(gam_Dino),
+                         Residuals=resid(gam_Dino))
+
+# We're gonna make our own qq plot with colors identifying sites
+# We base it on the structure of the model
+qq_data <- gam_Dino$model
+# then we add the values of fitted and residuals 
+# (but are they in the same order as the model? -> need to check that)
+qq_data <- bind_cols(qq_data, ModelOutputs)
+
+# Plot : verify that true data matches (more or less) model fit
+ggplot(qq_data)+
+  geom_point(aes(x = NO3.NO2, y = .derivative), color = 'red') +
+  geom_point(aes(x = NO3.NO2, y = Fitted), color = 'blue') +
+  theme_classic() +
+  labs(y = "Dinophysis derivative", x = "NO3.NO2")
+
+# The data is almost symmetrical around 0, the fit is therefore near a perfect 0
+
+# Custom qq-plot
+qqplot_custom <- ggplot(qq_data) +
+  stat_qq(aes(sample=Residuals), color = '#FC4D6B', alpha = .7) +
+  stat_qq_line(aes(sample=Residuals), color = 'black') +
+  theme_classic() +
+  labs(y="Sample Quantiles",x="Theoretical Quantiles",
+       title = 'qq-plot: 
+GAM of Dino derivative ~ NO3+NO2')
+
+qqplot_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/qqplot_custom_GAM_NO3.NO2.tiff', dpi = 300, height = 164, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# We can do the same for residuals vs fitted
+RvFplot_custom <- ggplot(qq_data)+
+  geom_point(aes(x=Fitted, y=Residuals), 
+             alpha = .7, color = '#FC4D6B') +
+  theme_classic() +
+  labs(y="Residuals",x="Fitted Values",
+       title = 'Residuals vs Fitted: 
+GAM of Dinophysis derivative ~ NO3+NO2')
+
+RvFplot_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/RvFplot_custom_GAM_NO3.NO2.tiff', dpi = 300, height = 120, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# And let's do one last diagnostic plot with histogram of residuals
+HistRes_custom <- ggplot(qq_data, aes(x = Residuals)) +
+  geom_histogram(binwidth = .005, fill = '#FC4D6B') +
+  theme_classic() +
+  labs(x='Residuals', y = 'Count',
+       title = 'Histogram of residuals: 
+GAM of Dinophysis derivative ~ NO3.NO2')
+
+HistRes_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/HistRes_custom_GAM_NO3.NO2.tiff', dpi = 300, height = 164, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# Plot the model against the data
+ggplot(data = gam_Dino_newdata,
+       aes(x = NO3.NO2, y = fit_resp)) +
+  geom_line(color = '#FC4D6B', linewidth = .5) +
+  geom_ribbon(aes(x = NO3.NO2,
+                  ymin = right_lwr, 
+                  ymax = right_upr), fill = '#FC4D6B', color = '#FC4D6B', alpha = .2) +
+  geom_point(data = Table_GAM, aes(x = NO3.NO2, y = .derivative), size = .8,
+             alpha = .5, color = '#FC4D6B') +
+  labs(x = 'NO3 + NO2', 
+       y = 'Dinophysis accumulation rate (d-1)',
+       title = 'GAM fit: Dinophysis derivative ~ NO3+NO2') +
+  theme_classic()
+
+# Save this plot
+# ggsave('Plots/GAMs/Drivers/GAM_fit_NO3.NO2.tiff', height = 135, width = 164,
+#        units = 'mm', compression = 'lzw')
