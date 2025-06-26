@@ -703,7 +703,7 @@ ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean,
   scale_fill_discrete(type = palette_bretagne8, guide = 'none') +
   scale_color_discrete(type = palette_bretagne8, guide = 'none') +
   # Custom label for y axis
-  labs(x = NULL, y = 'Variable importance') +
+  labs(x = NULL, y = 'Variable importance score') +
   # Flip x and y axes
   coord_flip() +
   # Reverse x axis so most important variable appears at the top
