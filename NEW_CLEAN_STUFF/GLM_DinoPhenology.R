@@ -1,6 +1,6 @@
 ###### Generalised Linear Models of Dinophysis change rate ###
 ## V. POCHIC
-# 2025-06-23
+# 2025-06-27
 
 # The goal here is to examine the relationship between Dinophysis change rate
 # (the derivative of the phenology GAM) and several selected environmental
@@ -25,6 +25,7 @@ library(viridis)
 library(ggpointdensity)
 library(RColorBrewer)
 library(ggnewscale)
+library(cmocean)
 
 ### Import data ####
 ## Part 1: Dinophysis sampling data ####
@@ -451,28 +452,30 @@ ggplot(data = gam_Dino_newdata,
 ## Surface solar radiation ####
 
 # Let's plot the data
+# Because the ssr values are very large numbers, we will look at the log10 of
+# the ssr to try and build a better model
 ggplot(data = Table_data_RF_multiyear,
-       aes(x = ssr, y = .derivative, color = Code_point_Libelle)) +
+       aes(x = log10(ssr), y = .derivative, color = Code_point_Libelle)) +
   # Points
   geom_point(size = 2, alpha = .7) +
   # Add 2 "ghost points" to force the minimum y-axis range to -0.1;0.1
-  geom_point(aes(x = 10, y = -.1), color = 'transparent', fill = 'transparent') +
-  geom_point(aes(x = 10, y = .1), color = 'transparent', fill = 'transparent') +
+  geom_point(aes(x = 5, y = -.1), color = 'transparent', fill = 'transparent') +
+  geom_point(aes(x = 5, y = .1), color = 'transparent', fill = 'transparent') +
   # Color scale (sampling sites)
   scale_color_discrete(type = pheno_palette12, guide = 'none') +
   # New color scale for ssrerature rug plot
   new_scale_color() +
-  geom_rug(data = Table_data_RF_multiyear, aes(x = ssr, y = NULL,
-                                               color = ssr)) +
-  scale_color_distiller(palette = 'RdBu', direction = -1, guide = 'none') +
+  geom_rug(data = Table_data_RF_multiyear, aes(x = log10(ssr), y = NULL,
+                                               color = log10(ssr))) +
+  scale_color_cmocean(name = 'solar', direction = 1, guide = 'none') +
   # facets
   facet_wrap(facets = 'Code_point_Libelle', scales = 'free') +
   # Labels
-  labs(x = 'Surface Solar Radiation', y = 'GAM derivative',) +
+  labs(x = 'Surface Solar Radiation (log scale)', y = 'GAM derivative',) +
   # Theme
   theme_classic()
 
-# Looks pretty damn clear that there is no relationship.
+# That's not clear.
 # Let's check with a GAM
 
 # We'll do this with the 10 sites we used for the random forest (Teychan and 
@@ -481,13 +484,14 @@ ggplot(data = Table_data_RF_multiyear,
 Table_GAM <- Table_data_RF_multiyear %>%
   filter(is.na(ssr) == FALSE) %>%
   filter(Code_point_Libelle != 'Teychan bis' & 
-           Code_point_Libelle != 'Auger')
+           Code_point_Libelle != 'Auger') %>%
+  mutate(log10ssr = log10(ssr))
 
 gam_Dino <- gam(data = Table_GAM, 
                 # Only a spline for the ssrerature
                 # 'k = -1' allows the model to fix the 'best' number of basic
                 # functions (= knots)
-                formula = .derivative~s(ssr, k = -1),
+                formula = .derivative~s(log10ssr, k = -1),
                 # Introducing the weights
                 # weights = unif_weight,
                 # Using a Poisson distribution for count data
@@ -499,8 +503,9 @@ summary(gam_Dino)
 gam.check(gam_Dino)
 
 # Create a new 'empty' dataset for storing model prediction (fit)
-gam_Dino_newdata <- expand_grid(ssr=seq(min(Table_GAM$ssr),
-                                         max(Table_GAM$ssr)))
+gam_Dino_newdata <- expand_grid(log10ssr=seq(min(Table_GAM$log10ssr),
+                                        max(Table_GAM$log10ssr), 
+                                        length.out = 300))
 
 ## Get the inverse link function of the model
 # With this function, we can transform the prediction we make on the link
@@ -526,7 +531,7 @@ min(gam_Dino_newdata$right_lwr) # Nice :)
 min(gam_Dino_newdata$fit_resp)
 max(gam_Dino_newdata$right_upr) # Nice too
 max(gam_Dino_newdata$fit_resp)
-# The maximum value seems really small
+# This looks really small again
 
 ### Checking the model
 ModelOutputs<-data.frame(Fitted=fitted(gam_Dino),
@@ -541,10 +546,10 @@ qq_data <- bind_cols(qq_data, ModelOutputs)
 
 # Plot : verify that true data matches (more or less) model fit
 ggplot(qq_data)+
-  geom_point(aes(x = ssr, y = .derivative), color = 'red') +
-  geom_point(aes(x = ssr, y = Fitted), color = 'blue') +
+  geom_point(aes(x = log10ssr, y = .derivative), color = 'red') +
+  geom_point(aes(x = log10ssr, y = Fitted), color = 'blue') +
   theme_classic() +
-  labs(y = "Dinophysis derivative", x = "ssr")
+  labs(y = "Dinophysis derivative", x = "log10(ssr)")
 
 # The data is almost symmetrical around 0, the fit is therefore near a perfect 0
 
@@ -554,12 +559,12 @@ qqplot_custom <- ggplot(qq_data) +
   stat_qq_line(aes(sample=Residuals), color = 'black') +
   theme_classic() +
   labs(y="Sample Quantiles",x="Theoretical Quantiles",
-       title = 'qq-plot: GAM of Dinophysis derivative ~ SSR')
+       title = 'qq-plot: GAM of Dinophysis derivative ~ log10(SSR)')
 
 qqplot_custom
 
 # Save the plot
-# ggsave('Plots/GAMs/Drivers/qqplot_custom_GAM_ssr.tiff', dpi = 300, height = 164, width = 164,
+# ggsave('Plots/GAMs/Drivers/qqplot_custom_GAM_log10ssr.tiff', dpi = 300, height = 164, width = 164,
 #                units = 'mm', compression = 'lzw')
 
 # We can do the same for residuals vs fitted
@@ -569,12 +574,12 @@ RvFplot_custom <- ggplot(qq_data)+
   theme_classic() +
   labs(y="Residuals",x="Fitted Values",
        title = 'Residuals vs Fitted: 
-GAM of Dinophysis derivative ~ SSR')
+GAM of Dinophysis derivative ~ log10(SSR)')
 
 RvFplot_custom
 
 # Save the plot
-# ggsave('Plots/GAMs/Drivers/RvFplot_custom_GAM_ssr.tiff', dpi = 300, height = 120, width = 164,
+# ggsave('Plots/GAMs/Drivers/RvFplot_custom_GAM_log10ssr.tiff', dpi = 300, height = 120, width = 164,
 #                units = 'mm', compression = 'lzw')
 
 # And let's do one last diagnostic plot with histogram of residuals
@@ -583,30 +588,30 @@ HistRes_custom <- ggplot(qq_data, aes(x = Residuals)) +
   theme_classic() +
   labs(x='Residuals', y = 'Count',
        title = 'Histogram of residuals: 
-GAM of Dinophysis derivative ~ SSR')
+GAM of Dinophysis derivative ~ log10(SSR)')
 
 HistRes_custom
 
 # Save the plot
-# ggsave('Plots/GAMs/Drivers/HistRes_custom_GAM_ssr.tiff', dpi = 300, height = 164, width = 164,
+# ggsave('Plots/GAMs/Drivers/HistRes_custom_GAM_log10ssr.tiff', dpi = 300, height = 164, width = 164,
 #                units = 'mm', compression = 'lzw')
 
 # Plot the model against the data
 ggplot(data = gam_Dino_newdata,
-       aes(x = ssr, y = fit_resp)) +
+       aes(x = log10ssr, y = fit_resp)) +
   geom_line(color = '#FBA823', linewidth = .5) +
-  geom_ribbon(aes(x = ssr,
+  geom_ribbon(aes(x = log10ssr,
                   ymin = right_lwr, 
                   ymax = right_upr), fill = '#FBA823', color = '#FBA823', alpha = .2) +
-  geom_point(data = Table_GAM, aes(x = ssr, y = .derivative), size = .8, 
+  geom_point(data = Table_GAM, aes(x = log10ssr, y = .derivative), size = .8, 
              alpha = .5, color = '#FBA823') +
-  labs(x = 'Surface Solar Radiation', 
+  labs(x = 'log10(Surface Solar Radiation)', 
        y = 'Dinophysis accumulation rate (d-1)',
-       title = 'GAM fit: Dinophysis derivative ~ SSR') +
+       title = 'GAM fit: Dinophysis derivative ~ log10(SSR)') +
   theme_classic()
 
 # Save this plot
-# ggsave('Plots/GAMs/Drivers/GAM_fit_SSR.tiff', height = 135, width = 164,
+# ggsave('Plots/GAMs/Drivers/GAM_fit_log10SSR.tiff', height = 135, width = 164,
 #        units = 'mm', compression = 'lzw')
 
 ## Stratification Index ####
