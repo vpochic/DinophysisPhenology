@@ -1,6 +1,6 @@
 ### CPR data for Dinophysis phenology ###
 
-# V. POCHIC, 2025-06-12
+# V. POCHIC, 2025-07-03
 
 # This script is made for plotting and analysing data from the CPR.
 
@@ -9,10 +9,12 @@
 library(tidyverse)
 library(viridis)
 library(cmocean)
+library(ggnewscale)
 library(ggmap)
 library(mapdata)
 library(maps)
 library(spatstat.univar)
+library(ggpubr)
 
 ## import data ####
 
@@ -511,10 +513,12 @@ palette_regions4 <- c('orange1', 'royalblue2', 'red4', 'forestgreen')
 
 ggplot() +
   # Plotting the tiles of longitude and latitude depending on Dinophysis presence
-  geom_rect(data = subset(CPR_data_sum, prop_pos<1),
+  geom_rect(data = subset(CPR_data_sum, nsamples>=3),
             aes(xmin = lon.bin-.25, xmax = lon.bin+.25,
                 ymin = lat.bin-.25, ymax = lat.bin+.25, # width = .5, height = .5,
                 fill = log10(mean_Dino+1)*prop_pos*log10(nsamples+1))) +
+  # adjust the limits of the color scale because of some extremes (prop_pos = 1)
+  # that dwarf the rest
   scale_fill_viridis() +
   # Plotting the land
   geom_polygon(data = Worldmap, aes(x = long, y = lat, group = group), 
@@ -672,6 +676,79 @@ by region',
 
 # Save that!
 # ggsave('Plots/CPR/CPR_Hovmoller_abundance.tiff', height = 150, width = 164, units = 'mm',
+#        dpi = 300, compression = 'lzw')
+
+### Plots for publication ####
+# Let's combine 2 plots: the map and the hovmoller of Dino presence.
+# ggarrange won't do the trick here, so we'll build 2 compatible plots that
+# we will then arrange on ppt
+
+# First, the map
+ggplot() +
+  # Plotting the tiles of longitude and latitude depending on Dinophysis presence
+  geom_rect(data = subset(CPR_data_sum, nsamples>=3),
+            aes(xmin = lon.bin-.25, xmax = lon.bin+.25,
+                ymin = lat.bin-.25, ymax = lat.bin+.25, # width = .5, height = .5,
+                fill = log(prop_pos+1))) +
+  # adjust the limits of the color scale so it is compatible with the second
+  # plot. No legend here.
+  scale_fill_viridis(limits = c(0, 0.694),
+    breaks = c(log(0+1), log(0.1+1), log(0.25+1), (log(0.5+1))),
+    labels = c('0', '0.1', '0.25', '0.5'), guide = 'none') +
+  # Plotting the land
+  geom_polygon(data = Worldmap, aes(x = long, y = lat, group = group), 
+               fill = "grey80", color = 'gray10', linewidth = .25)+
+  # Plotting the limits of the regions
+  geom_polygon(data = regions_polygon, aes(x = lon, y = lat, group = region,
+                                           color = as_factor(region)), 
+               fill = "transparent", linewidth = 1) +
+  # Plotting the id of each region
+  geom_text(data = regions_id, aes(x = lon, y = lat, color = as_factor(region),
+                                   label = region), size = 6)+
+  scale_color_discrete(type = palette_regions4, guide = 'none') +
+  new_scale_color() +
+  
+  ### Plotting REPHY sampling sites
+  geom_point(data = Table_sites, aes(x = Longitude.mean, y = Latitude.mean, 
+                                     color = Code_point_Libelle), size = 2.5)+
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  
+  # Limits of the map
+  coord_fixed(xlim=c(-18,
+                     18), 
+              ylim=c(35,
+                     65),
+              ratio = 1.15)+
+  # Labels
+  labs(title = 'A',
+       y = 'Latitude (degrees)', x = 'Longitude (degrees)',
+       # title = "Dinophysis in the NE Atlantic (CPR data)"
+       )+
+  theme_bw() +
+  theme(legend.position = 'bottom')
+
+# Save the map
+# ggsave('Plots/CPR/CPR_REPHY_Dinophysis_map_composite_pub.tiff', height = 200, width = 164,
+#        units = 'mm', dpi = 300, compression = 'lzw')
+
+# Then, the Hovmoller diagram
+ggplot(data = subset(CPR_data_hovmoller, region > 0)) +
+  geom_tile(aes(x = Year, y = Month, fill = log(prop_pos+1))) +
+  scale_fill_viridis(limits = c(0,0.694),
+    breaks = c(log(0+1), log(0.1+1), log(0.25+1), log(0.5+1), log(2)),
+                     labels = c('0', '0.1', '0.25', '0.5', '1')) +
+  facet_wrap(facets = 'region') +
+  scale_y_continuous(limits = c(0, 13), 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  labs(title = 'B',
+       fill = 'Dinophysis presence 
+(proportion of samples,
+log scale)') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# Save that!
+# ggsave('Plots/CPR/CPR_Hovmoller_proportion_4regions_pub.tiff', height = 125, width = 164, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
 ### Hovmoller diagrams by fortnight (does not work well) ####

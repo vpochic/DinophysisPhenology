@@ -1,6 +1,6 @@
 ###### GAM for Dinophysis phenology with mgcv ###
 ## V. POCHIC
-# 2025-06-04
+# 2025-07-03
 
 #### Packages and functions ####
 library(tidyverse)
@@ -817,6 +817,37 @@ ggplot(pred_plot_cells_per_L, aes(x = Day, y = median.fit,
 # Saving plot
 # ggsave('Plots/GAMs/gam_Dino_allsites_crop_cells_per_L.tiff', dpi = 300, height = 175, width = 250,
 #        units = 'mm', compression = 'lzw')
+
+# Plot for the publication (fig. 2)
+
+ggplot(pred_plot_cells_per_L, aes(x = Day, y = median.fit, 
+                                  color = Code_point_Libelle,
+                                  fill = Code_point_Libelle)) +
+  # Raw data as points
+  geom_point(data = Season_Dino_crop, aes(x = Day, y = Dinophysis_genus), 
+             size = .55, alpha = .35) +
+  # GAM with median fit (path) and 95% confidence interval (ribbon)
+  geom_ribbon(aes(ymin = lwrS, ymax = uprS), lwd = .25, alpha = 0.2) +
+  geom_path(lwd = .5) +
+  # Add a "ghost point" to force the minimum y-axis range to 5
+  geom_point(aes(x = 1, y = 500), color = 'transparent', fill = 'transparent',
+             size = .8, alpha = .5) +
+  # Labels
+  labs(y = c(expression(paste("Dinophysis cells.L"^'-1'))),
+       x = "Julian day",
+       title = "GAM of Dinophysis phenology (2007-2022)") +
+  # facets
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  # Set the color palette :
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
+  theme_classic() +
+  theme(strip.text = element_text(size = 6))
+
+# Saving plot
+# ggsave('Plots/Figures_article/version_1/Fig2_gam_Dino_allsites_crop_cells_per_L_pub.tiff',
+# dpi = 300, height = 125, width = 164,
+# units = 'mm', compression = 'lzw')
 
 #### Alternative GAM for teaching purposes ####
 
