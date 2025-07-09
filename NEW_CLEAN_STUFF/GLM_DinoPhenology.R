@@ -950,3 +950,174 @@ ggplot(data = gam_Dino_newdata,
 # Save this plot
 # ggsave('Plots/GAMs/Drivers/GAM_fit_NO3.NO2.tiff', height = 135, width = 164,
 #        units = 'mm', compression = 'lzw')
+
+#### Multiple effects GAM ####
+
+## The objective is to build a model that takes into account all predictor
+# variables that we consider relevant. For the 12-sites model, we will consider
+# SST, ssr, Stratification, Salinity and [Chlorophyll a]
+
+Table_GAM <- Table_data_RF_multiyear %>%
+  filter(is.na(TEMP) == FALSE & is.na(CHLOROA) == FALSE &
+           is.na(Stratification_Index) == FALSE & is.na(SALI) == FALSE &
+           is.na(ssr) == FALSE) %>%
+  filter(Code_point_Libelle != 'Teychan bis' & 
+           Code_point_Libelle != 'Auger')
+
+gam_Dino <- gam(data = Table_GAM, 
+                # Only a spline for the temperature
+                # 'k = -1' allows the model to fix the 'best' number of basic
+                # functions (= knots)
+                formula = .derivative ~ s(TEMP, k = -1, 
+                                          by = Code_point_Libelle) 
+                                      + s(SALI, k = -1, 
+                                          by = Code_point_Libelle),
+                # Using a Gaussian distribution for the derivative 
+                # (our response variable)
+                family = gaussian(),
+                # Restricted maximum likelihood estimation (recommended method)
+                method = 'REML')
+
+summary(gam_Dino)
+gam.check(gam_Dino)
+
+# Create a new 'empty' dataset for storing model prediction (fit)
+gam_Dino_newdata <- expand_grid(TEMP=seq(min(Table_GAM$TEMP),
+                                         max(Table_GAM$TEMP), length.out = 30),
+                                SALI=seq(min(Table_GAM$SALI),
+                                         max(Table_GAM$SALI), length.out = 5),
+                                Code_point_Libelle = unique(Table_GAM$Code_point_Libelle))
+
+## Get the inverse link function of the model
+# With this function, we can transform the prediction we make on the link
+#scale to the response scale
+ilink <- gam_Dino$family$linkinv
+
+## Predict : add fit and se.fit on the **link** scale
+gam_Dino_newdata <- bind_cols(gam_Dino_newdata, 
+                              setNames(as_tibble(
+                                predict(gam_Dino, gam_Dino_newdata, 
+                                        se.fit = TRUE, type = 'link')[1:2]),
+                                c('fit_link','se_link')))
+
+## Create the 95% confidence interval (2*standard error fit) and backtransform 
+# to response variable using the inverse link function
+gam_Dino_newdata <- mutate(gam_Dino_newdata,
+                           fit_resp  = ilink(fit_link),
+                           right_upr = ilink(fit_link + (2 * se_link)),
+                           right_lwr = ilink(fit_link - (2 * se_link)))
+# Check the confidence interval. It should not extend below 0 (negative counts
+# are impossible)
+min(gam_Dino_newdata$right_lwr) # Nice :)
+min(gam_Dino_newdata$fit_resp)
+max(gam_Dino_newdata$right_upr) # Nice too
+max(gam_Dino_newdata$fit_resp)
+# The confidence intervals go pretty wild
+
+# Saving data to make another plot in another script
+# write.csv2(gam_Dino_newdata, 'gam_Dino_multiyear_data.csv', row.names = FALSE,
+#            fileEncoding = 'ISO-8859-1')
+
+### Checking the model
+ModelOutputs<-data.frame(Fitted=fitted(gam_Dino),
+                         Residuals=resid(gam_Dino))
+
+# We're gonna make our own qq plot with colors identifying sites
+# We base it on the structure of the model
+qq_data <- gam_Dino$model
+# then we add the values of fitted and residuals 
+# (but are they in the same order as the model? -> need to check that)
+qq_data <- bind_cols(qq_data, ModelOutputs)
+
+# Plot : verify that true data matches (more or less) model fit
+ggplot(qq_data)+
+  geom_point(aes(x = TEMP, y = .derivative), color = 'red') +
+  geom_point(aes(x = TEMP, y = Fitted), color = 'blue') +
+  facet_wrap(facets = 'Code_point_Libelle', scales = 'free_y') +
+  theme_classic() +
+  labs(y = "Dinophysis derivative", x = "TEMP")
+
+# The fir varies between sites, which is expected
+
+# Custom qq-plot
+qqplot_custom <- ggplot(qq_data) +
+  stat_qq(aes(sample=Residuals, color = Code_point_Libelle), alpha = .7) +
+  stat_qq_line(aes(sample=Residuals), color = 'black') +
+  scale_color_discrete(type = pheno_palette10, guide = 'none') +
+  facet_wrap(facets = 'Code_point_Libelle') +
+  theme_classic() +
+  labs(y="Sample Quantiles",x="Theoretical Quantiles",
+       title = 'qq-plot: GAM of Dinophysis derivative ~ SST + SALI')
+
+qqplot_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/qqplot_custom_GAM_multo.tiff', dpi = 300, height = 164, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# We can do the same for residuals vs fitted
+RvFplot_custom <- ggplot(qq_data)+
+  geom_point(aes(x=Fitted, y=Residuals, color = Code_point_Libelle), 
+             alpha = .7) +
+  scale_color_discrete(type = pheno_palette10, guide = 'none') +
+  facet_wrap(facets = 'Code_point_Libelle', scales = 'free_x') +
+  theme_classic() +
+  labs(y="Residuals",x="Fitted Values",
+       title = 'Residuals vs Fitted: 
+GAM of Dinophysis derivative ~ SST + SALI')
+
+RvFplot_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/RvFplot_custom_GAM_multi.tiff', dpi = 300, height = 120, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# And let's do one last diagnostic plot with histogram of residuals
+HistRes_custom <- ggplot(qq_data, aes(x = Residuals, fill = Code_point_Libelle)) +
+  geom_histogram(bins = 100) +
+  scale_fill_discrete(type = pheno_palette10, guide = 'none') +
+  facet_wrap(facets = 'Code_point_Libelle', scales = 'free') +
+  theme_classic() +
+  labs(x='Residuals', y = 'Count',
+       title = 'Histogram of residuals: 
+GAM of Dinophysis derivative ~ SST')
+
+HistRes_custom
+
+# Save the plot
+# ggsave('Plots/GAMs/Drivers/HistRes_custom_GAM_multi.tiff', dpi = 300, height = 164, width = 164,
+#                units = 'mm', compression = 'lzw')
+
+# Plot the model against the data
+
+# Color palette
+pheno_palette10 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#F7B41D')
+
+
+ggplot(data = gam_Dino_newdata,
+       aes(x = TEMP, y = fit_resp, color = Code_point_Libelle, 
+           fill = Code_point_Libelle)) +
+  geom_line(linewidth = .5) +
+  geom_ribbon(aes(x = TEMP,
+                  ymin = right_lwr, 
+                  ymax = right_upr, fill = Code_point_Libelle, 
+                  color = Code_point_Libelle), alpha = .2) +
+  geom_point(data = Table_GAM, aes(x = TEMP, y = .derivative, 
+                                   color = Code_point_Libelle),
+             size = .8, alpha = .5) +
+  scale_color_discrete(type = pheno_palette10, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette10, guide = 'none') +
+  facet_wrap(facets = 'Code_point_Libelle', scales = 'free') +
+  labs(x = 'Sea Surface Temperature (°C)', 
+       y = 'Dinophysis accumulation rate (d-1)',
+       title = 'GAM fit: Dinophysis derivative ~ SST + SALI') +
+  theme_classic()
+
+# I think X models are fitted for the X levels of salinity. But i'm not sure.
+# I don't understand.
+
+# Save this plot
+# ggsave('Plots/GAMs/Drivers/GAM_fit_SST.tiff', height = 135, width = 164,
+#        units = 'mm', compression = 'lzw')
