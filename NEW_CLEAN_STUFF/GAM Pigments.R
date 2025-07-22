@@ -1,6 +1,6 @@
 ### GAMs of pigment concentrations ###
 # Part of the Dinophysis Phenology project
-# V. POCHIC 2025-06-05
+# V. POCHIC 2025-07-22
 
 ### Required packages ####
 
@@ -1097,75 +1097,6 @@ ggarrange(plot_Allo_Antifer, plot_Meso_Antifer, plot_Dino_Antifer, nrow = 3,
 # ggsave('Plots/GAMs/Successions/Succession_plot_Antifer.tiff', height = 270, width = 140,
 #                dpi = 300, unit = 'mm', compression = 'lzw')
 
-## Cabourg ####
-
-# Alloxanthin
-plot_Allo_Cabourg <- ggplot() +
-  # plot the data
-  geom_point(data = Season_Allo_Cabourg, aes(x = Day, y = Allo), size = 2,
-             alpha = .3, color = 'orangered') +
-  # plot the GAM
-  geom_ribbon(data = gam_Allo_Cabourg, aes(x = Day, ymin = lwrP, 
-                                           ymax = uprP),
-              linewidth = .35, alpha = .2,
-              color = 'orangered', fill = 'orangered') +
-  geom_line(data = gam_Allo_Cabourg, aes(x = Day, y = median.fit),
-            linewidth = .7, color = 'orangered') +
-  # cut the y scale at 22
-  #scale_y_continuous(limits = c(0,22)) +
-  # Text
-  labs(title = 'Cabourg',
-       subtitle = 'Alloxanthin (microgram.L-1)', x = NULL, 
-       y = NULL) +
-  theme_classic()
-
-plot_Allo_Cabourg
-
-# Mesodinium
-plot_Meso_Cabourg <- ggplot() +
-  # plot the data as points
-  geom_point(data = Season_Meso_Cabourg, aes(x = Day, y = true_count), size = 2,
-             alpha = .3, color = 'orangered') +
-  # plot the GAM
-  geom_ribbon(data = gam_Meso_Cabourg, aes(x = Day, ymin = lwrS, 
-                                           ymax = uprS),
-              linewidth = .35, alpha = .2,
-              color = 'orangered', fill = 'orangered') +
-  geom_line(data = gam_Meso_Cabourg, aes(x = Day, y = median.fit),
-            linewidth = .7, color = 'orangered') +
-  # Text
-  labs(subtitle = 'Mesodinium (cells counted)', x = NULL, 
-       y = NULL) +
-  theme_classic()
-
-plot_Meso_Cabourg
-
-# Dinophysis
-plot_Dino_Cabourg <- ggplot() +
-  # plot the data as points
-  geom_point(data = Season_Dino_Cabourg, aes(x = Day, y = true_count), size = 2,
-             alpha = .3, color = 'orangered') +
-  # plot the GAM
-  geom_ribbon(data = gam_Dino_Cabourg, aes(x = Day, ymin = lwrS, 
-                                           ymax = uprS),
-              linewidth = .35, alpha = .2,
-              color = 'orangered', fill = 'orangered') +
-  geom_line(data = gam_Dino_Cabourg, aes(x = Day, y = median.fit),
-            linewidth = .7, color = 'orangered') +
-  # Text
-  labs(subtitle = 'Dinophysis (cells counted)', x = 'Julian day', y = NULL) +
-  theme_classic()
-
-plot_Dino_Cabourg
-
-# Arrange the plot
-ggarrange(plot_Allo_Cabourg, plot_Meso_Cabourg, plot_Dino_Cabourg, nrow = 3,
-          align = 'v')
-
-# Save the plot
-# ggsave('Plots/GAMs/Successions/Succession_plot_Cabourg.tiff', height = 270, width = 140,
-#                dpi = 300, unit = 'mm', compression = 'lzw')
-
 ## Men er Roue ####
 
 # Alloxanthin
@@ -1252,8 +1183,9 @@ plot_Allo_OL <- ggplot() +
   # cut the y scale at 22
   #scale_y_continuous(limits = c(0,22)) +
   # Text
-  labs(title = 'Ouest Loscolo',
-       subtitle = 'Alloxanthin (microgram.L-1)', x = NULL, 
+  labs(# title = 'B. Ouest Loscolo',
+       subtitle = '',
+       x = NULL, # subtitle = 'Alloxanthin (microgram.L-1)', 
        y = NULL) +
   theme_classic()
 
@@ -1262,17 +1194,18 @@ plot_Allo_OL
 # Mesodinium
 plot_Meso_OL <- ggplot() +
   # plot the data as points
-  geom_point(data = Season_Meso_OL, aes(x = Day, y = true_count), size = 2,
+  geom_point(data = Season_Meso_OL, aes(x = Day, y = true_count*100), size = 2,
              alpha = .3, color = '#5995E3') +
   # plot the GAM
-  geom_ribbon(data = gam_Meso_OL, aes(x = Day, ymin = lwrS, 
-                                       ymax = uprS),
+  geom_ribbon(data = gam_Meso_OL, aes(x = Day, ymin = lwrS*100, 
+                                       ymax = uprS*100),
               linewidth = .35, alpha = .2,
               color = '#5995E3', fill = '#5995E3') +
-  geom_line(data = gam_Meso_OL, aes(x = Day, y = median.fit),
+  geom_line(data = gam_Meso_OL, aes(x = Day, y = median.fit*100),
             linewidth = .7, color = '#5995E3') +
   # Text
-  labs(subtitle = 'Mesodinium (cells counted)', x = NULL, 
+  labs(subtitle = '',
+       x = NULL, # subtitle = 'Mesodinium (cells counted)',
        y = NULL) +
   theme_classic()
 
@@ -1281,25 +1214,103 @@ plot_Meso_OL
 # Dinophysis
 plot_Dino_OL <- ggplot() +
   # plot the data as points
-  geom_point(data = Season_Dino_OL, aes(x = Day, y = true_count), size = 2,
+  geom_point(data = Season_Dino_OL, aes(x = Day, y = true_count*100), size = 2,
              alpha = .3, color = '#5995E3') +
   # plot the GAM
-  geom_ribbon(data = gam_Dino_OL, aes(x = Day, ymin = lwrS, 
-                                       ymax = uprS),
+  geom_ribbon(data = gam_Dino_OL, aes(x = Day, ymin = lwrS*100, 
+                                       ymax = uprS*100),
               linewidth = .35, alpha = .2,
               color = '#5995E3', fill = '#5995E3') +
-  geom_line(data = gam_Dino_OL, aes(x = Day, y = median.fit),
+  geom_line(data = gam_Dino_OL, aes(x = Day, y = median.fit*100),
             linewidth = .7, color = '#5995E3') +
   # Text
-  labs(subtitle = 'Dinophysis (cells counted)', x = 'Julian day', y = NULL) +
+  labs(subtitle = '', 
+       x = 'Julian day', y = NULL) + # subtitle = 'Dinophysis (cells counted)', 
   theme_classic()
 
 plot_Dino_OL
 
 # Arrange the plot
-ggarrange(plot_Allo_OL, plot_Meso_OL, plot_Dino_OL, nrow = 3,
+succession_OL <- ggarrange(plot_Allo_OL, plot_Meso_OL, plot_Dino_OL, nrow = 3,
           align = 'v')
 
 # Save the plot
-ggsave('Plots/GAMs/Successions/Succession_plot_OL_pub.tiff', 
-       height = 130, width = 82, dpi = 300, unit = 'mm', compression = 'lzw')
+# ggsave('Plots/GAMs/Successions/Succession_plot_OL_pub.tiff', 
+#        height = 130, width = 82, dpi = 300, unit = 'mm', compression = 'lzw')
+
+## Cabourg ####
+
+# Alloxanthin
+plot_Allo_Cabourg <- ggplot() +
+  # plot the data
+  geom_point(data = Season_Allo_Cabourg, aes(x = Day, y = Allo), size = 2,
+             alpha = .3, color = 'orangered') +
+  # plot the GAM
+  geom_ribbon(data = gam_Allo_Cabourg, aes(x = Day, ymin = lwrP, 
+                                      ymax = uprP),
+              linewidth = .35, alpha = .2,
+              color = 'orangered', fill = 'orangered') +
+  geom_line(data = gam_Allo_Cabourg, aes(x = Day, y = median.fit),
+            linewidth = .7, color = 'orangered') +
+  # cut the y scale at 22
+  #scale_y_continuous(limits = c(0,22)) +
+  # Text
+  labs(# title = 'A. Cabourg',
+       subtitle = 'Alloxanthin (microgram.L-1)', x = NULL, 
+       y = NULL) +
+  theme_classic()
+
+plot_Allo_Cabourg
+
+# Mesodinium
+plot_Meso_Cabourg <- ggplot() +
+  # plot the data as points
+  geom_point(data = Season_Meso_Cabourg, aes(x = Day, y = true_count*100), size = 2,
+             alpha = .3, color = 'orangered') +
+  # plot the GAM
+  geom_ribbon(data = gam_Meso_Cabourg, aes(x = Day, ymin = lwrS*100, 
+                                      ymax = uprS*100),
+              linewidth = .35, alpha = .2,
+              color = 'orangered', fill = 'orangered') +
+  geom_line(data = gam_Meso_Cabourg, aes(x = Day, y = median.fit*100),
+            linewidth = .7, color = 'orangered') +
+  # Text
+  labs(subtitle = 'Mesodinium (cells per L)', x = NULL, 
+       y = NULL) +
+  theme_classic()
+
+plot_Meso_Cabourg
+
+# Dinophysis
+plot_Dino_Cabourg <- ggplot() +
+  # plot the data as points
+  geom_point(data = Season_Dino_Cabourg, aes(x = Day, y = true_count*100), size = 2,
+             alpha = .3, color = 'orangered') +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_Cabourg, aes(x = Day, ymin = lwrS*100, 
+                                      ymax = uprS*100),
+              linewidth = .35, alpha = .2,
+              color = 'orangered', fill = 'orangered') +
+  geom_line(data = gam_Dino_Cabourg, aes(x = Day, y = median.fit*100),
+            linewidth = .7, color = 'orangered') +
+  # Text
+  labs(subtitle = 'Dinophysis (cells per L)', x = 'Julian day', y = NULL) +
+  theme_classic()
+
+plot_Dino_Cabourg
+
+# Arrange the plot
+succession_Cab <- ggarrange(plot_Allo_Cabourg, plot_Meso_Cabourg, plot_Dino_Cabourg, nrow = 3,
+          align = 'v')
+
+# Save the plot
+# ggsave('Plots/GAMs/Successions/Succession_plot_Cabourg_pub.tiff', 
+#        height = 130, width = 82, dpi = 300, unit = 'mm', compression = 'lzw')
+
+## Cabourg + Ouest Loscolo (publication style) ####
+
+ggarrange(succession_Cab, succession_OL, nrow = 1,
+          align = 'h')
+
+# ggsave('Plots/Figures_article/version_1/Figure5_succession_plot_Cab_OL.tiff',
+#        width = 164, height = 170, units = 'mm', dpi = 300, compression = 'lzw')
