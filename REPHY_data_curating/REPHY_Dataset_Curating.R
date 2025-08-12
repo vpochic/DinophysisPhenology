@@ -1,5 +1,5 @@
 #### Script REPHY : curating data
-# V. POCHIC 2024/08/26
+# V. POCHIC 2025/08/12
 
 ### Required packages ####
 
@@ -63,6 +63,7 @@ colnames(Table1)[which(names(Table1) == "Prélèvement...Immersion")] <- "Profon
 colnames(Table1)[which(names(Table1) == "Prélèvement...Niveau")] <- "Prelevement.niveau"
 colnames(Table1)[which(names(Table1) == "Résultat...Code.paramètre")] <- "Code.parametre"
 colnames(Table1)[which(names(Table1) == "Résultat...Libellé.paramètre")] <- "Parametre"
+colnames(Table1)[which(names(Table1) == "Résultat...Libellé.méthode")] <- "Methode.analyse"
 colnames(Table1)[which(names(Table1) == "Résultat...Niveau.de.qualité")] <- "Qualite.resultat"
 colnames(Table1)[which(names(Table1) == "Prélèvement...Niveau.de.qualité")] <- "Qualite.prelevement"
 colnames(Table1)[which(names(Table1) == "Passage...Service.saisisseur...Libellé")] <- "Service.saisie"
@@ -75,7 +76,7 @@ colnames(Table1)[which(names(Table1) == "Passage...Identifiant.interne")] <- "ID
 #### Curate table to keep only desired variables ####
 Table1 <- Table1 %>%
   dplyr::select(c('ZM_Quadrige_Numero', 'Code_point_Mnemonique', 'Code_point_Libelle', 'Date', 
-                  'Heure', 'lon', 'lat', 'Mesure_Unite', 'Mesure_Symbole', 'Taxon', 'Valeur_mesure', 
+                  'Heure', 'lon', 'lat', 'Mesure_Unite', 'Mesure_Symbole', 'Taxon', 'Valeur_mesure', 'Methode.analyse',
                   'Prelevement.niveau', 'Profondeur.metre', 'Code.parametre', 'Parametre', 
                   'Qualite.prelevement', 'Qualite.resultat', 'ID.interne.prelevement', 'ID.interne.passage'))
 
@@ -155,7 +156,7 @@ Table1_phyto_taxon <- Table1_phyto_select %>%
 # Spread the hydrology measurements
 
 Table1_hydro_select <- Table1_hydro %>%
-  select(c('ID.interne.passage', 'Qualite.resultat', 'Code.parametre', 'Valeur_mesure', 
+  select(c('ID.interne.passage', 'Qualite.resultat', 'Code.parametre', 'Valeur_mesure', 'Methode.analyse', 
            'Prelevement.niveau','Profondeur.metre', 'Code.Region', 'Region', 'Date', 'Day',
            'Month', 'Year', 'Heure', 'Code_point_Libelle', 'Code_point_Mnemonique',
            'lon', 'lat')) %>%
@@ -168,17 +169,23 @@ Table1_hydro_select <- Table1_hydro %>%
   group_by(Code.Region, Code_point_Libelle, lon, lat, Year, Month, Date, ID.interne.passage, Code.parametre) %>%
   # There is probably something shifty here, regarding multiple CHLOROA measurements at certain stations,
   # made with different methods. For now we average everything but this is quite bad.
+  ### 2025/08/12 And now's the time to fix it! We're going to create another
+  # category, named CHLOROA_HPLC, for measures of chl a in HPLC, that come on top
+  # of the spectrometric method in many cases
+  mutate(Code.parametre = ifelse(
+    Methode.analyse == 'Chromatographie liquide - pigments phytoplanctoniques (Van Heukelem et Thomas 2001)',
+    'CHLOROA_HPLC', Code.parametre)) %>%
   summarise(Valeur_mesure = mean(Valeur_mesure), .groups = 'keep') %>%
   pivot_wider(names_from = Code.parametre, values_from = Valeur_mesure)
 
 # write the table to free some memory space
-# write.csv2(Table1_hydro_select, 'Table1_hydro_select.csv', row.names = FALSE, fileEncoding = "ISO-8859-1")
+# write.csv2(Table1_hydro_select, 'Table1_hydro_select_20250812.csv', row.names = FALSE, fileEncoding = "ISO-8859-1")
 
 ### An additional line for checking model performance on temperature and salinity
 # We keep all sampling levels to gather maximum info on T and S at several depths
 Table1_hydro_models <- Table1_hydro %>%
-  select(c('ID.interne.passage', 'ID.interne.prelevement',
-           'Qualite.resultat', 'Code.parametre', 'Valeur_mesure', 'Prelevement.niveau',
+  select(c('ID.interne.passage', 'ID.interne.prelevement', 'Qualite.resultat', 
+           'Code.parametre', 'Valeur_mesure', 'Mathode.analyse', 'Prelevement.niveau',
            'Profondeur.metre', 'Code.Region', 'Region', 'Date', 'Day', 'Month', 'Year', 'Heure',
            'Code_point_Libelle', 'Code_point_Mnemonique', 'lon', 'lat')) %>%
   #filter(Code_point_Libelle == 'Ouest Loscolo')
@@ -189,7 +196,12 @@ Table1_hydro_models <- Table1_hydro %>%
            Code.parametre, Prelevement.niveau, Profondeur.metre) %>%
   # There is probably something shifty here, regarding multiple CHLOROA measurements at certain stations,
   # made with different methods. For now we average everything but this is quite bad.
-  summarise(Valeur_mesure = mean(Valeur_mesure), .groups = 'keep') %>%
+  ### 2025/08/12 And now's the time to fix it! We're going to create another
+  # category, named CHLOROA_HPLC, for measures of chl a in HPLC, that come on top
+  # of the spectrometric method in many cases
+  mutate(Code.parametre = ifelse(
+    Methode.analyse == 'Chromatographie liquide - pigments phytoplanctoniques (Van Heukelem et Thomas 2001)',
+    'CHLOROA_HPLC', Code.parametre)) %>%
   pivot_wider(names_from = Code.parametre, values_from = Valeur_mesure)
 
 # write the table to free some memory space
