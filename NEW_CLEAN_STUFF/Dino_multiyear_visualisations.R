@@ -1,6 +1,6 @@
 ###### Dinophysis phenology: visualisations on multiple years ###
 ## V. POCHIC
-# 2025-06-25
+# 2025-08-12
 
 # Additional visualisations using the results of GAM, REPHY data and satellite
 # observations, to observe Dinophysis dynamics over several years
@@ -119,23 +119,30 @@ GAM_peak <- Dino_response_pred %>%
 GAM_pit_select <- filter(GAM_pit, Code_point_Libelle %in% 
                          c('Men er Roue', 'Ouest Loscolo',
                          'Le Cornard', 'Auger',
-                         'Arcachon - Bouée 7', 'Teychan bis')) %>%
+                         'Arcachon - Bouée 7', 'Teychan bis',
+                         'Bouzigues (a)', 'Parc Leucate 2', 'Sète mer')) %>%
 # We see there are 2 pits for many sites: 1 corresponds to the pit between the 
 # 2 peaks, and 1 to the "renewal" after the winter. We will select only the 
-# former (Day > 70 and < 300)
-  filter(Day > 70 & Day < 300) %>%
+# former (Day > 70 and < 300). This works for all sites except for Parc Leucate.
+# We create a special condition for Parc Leucate (pit at day 55)
+  filter(ifelse(Code_point_Libelle != 'Parc Leucate 2', Day > 70 & Day < 300,
+                Day == 55)) %>%
   # Reorder the site as a factor
   mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
   mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
                                           'Men er Roue', 'Ouest Loscolo',
                                           'Le Cornard', 'Auger',
-                                          'Arcachon - Bouée 7', 'Teychan bis'))
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Bouzigues (a)', 'Parc Leucate 2',
+                                          'Sète mer'))
 
 GAM_peak_select <- filter(GAM_peak, Code_point_Libelle %in% 
                            c('Antifer ponton pétrolier', 'Cabourg',
                              'Men er Roue', 'Ouest Loscolo',
                              'Le Cornard', 'Auger',
-                             'Arcachon - Bouée 7', 'Teychan bis')) %>%
+                             'Arcachon - Bouée 7', 'Teychan bis',
+                             'Bouzigues (a)', 'Parc Leucate 2',
+                             'Sète mer')) %>%
   
   # Reorder the site as a factor
   mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
@@ -143,7 +150,9 @@ GAM_peak_select <- filter(GAM_peak, Code_point_Libelle %in%
                                           'Antifer ponton pétrolier', 'Cabourg',
                                           'Men er Roue', 'Ouest Loscolo',
                                           'Le Cornard', 'Auger',
-                                          'Arcachon - Bouée 7', 'Teychan bis'))
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Bouzigues (a)', 'Parc Leucate 2',
+                                          'Sète mer'))
 
 # Next step: split the maxima in 2 periods (before and after the pit)
 
@@ -184,8 +193,31 @@ Maxima_Dino_2 <- Season_Dino_nozeros %>%
                   1,
                   ifelse(Code_point_Libelle == 'Teychan bis',
                          2,
+           # Parc Leucate 2
+           ifelse(Code_point_Libelle == 'Parc Leucate 2' & Day <= 234 
+                  # Need to add this condition because of winter peak continuing
+                  # into the next year
+                  & Day >= 55,
+                  1,
+                  ifelse(Code_point_Libelle == 'Parc Leucate 2',
+                         2,
+          # Bouzigues (a)
+           ifelse(Code_point_Libelle == 'Bouzigues (a)' & Day <= 232,
+                  1,
+                  ifelse(Code_point_Libelle == 'Bouzigues (a)',
+                         2,
+          # Sète mer
+           ifelse(Code_point_Libelle == 'Sète mer' & Day <= 209,
+                  1,
+                  ifelse(Code_point_Libelle == 'Sète mer',
+                         2,
+          # Diana centre
+           ifelse(Code_point_Libelle == 'Diana centre' & Day <= 164,
+                  1,
+                  ifelse(Code_point_Libelle == 'Diana centre',
+                         2,
            # All other sites
-           1))))))))))))) %>%
+           1))))))))))))))))))))) %>%
   # Add period as a grouping variable
   group_by(Code_point_Libelle, Year, period) %>%
   # extract rows with yearly maxima of 'true_count' (slice() retains groups)
@@ -202,7 +234,7 @@ Maxima_Dino_2 <- Season_Dino_nozeros %>%
                                           'Parc Leucate 2', 'Bouzigues (a)',
                                           'Sète mer', 'Diana centre')) %>%
 # Keep only Dinophysis cell densities >= X00 cells/L (more than X cells counted)
-filter(true_count >= 3)
+filter(true_count >= 1)
 
 # GAM fit
 GAM_peak_select2 <- GAM_peak_select %>%
@@ -291,6 +323,99 @@ ggplot(data = subset(Maxima_Dino_2,
 # ggsave('Plots/REPHY/Maxima_plot2_8sites_3.tiff', dpi = 300, height = 125, width = 164,
 #                units = 'mm', compression = 'lzw')
 
+### Why stop at 8? Let's do the 16 sites!
+
+# New color scale for only the sites with smooths
+pheno_palette12 <- c('red3', 'orangered', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646',
+                     '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
+
+
+# plot
+ggplot(Maxima_Dino_2, 
+       aes(x = Year, y = Day, color = Code_point_Libelle, 
+           shape = as.factor(period))) +
+  # then the points
+  geom_point(size = 4, alpha = .8) +
+  # add linear regression fit before the points
+  geom_smooth(data = subset(Maxima_Dino_2,
+                            Code_point_Libelle %in% 
+                              c('Antifer ponton pétrolier', 'Cabourg',
+                                'Men er Roue', 'Ouest Loscolo',
+                                'Le Cornard', 'Auger',
+                                'Arcachon - Bouée 7', 'Teychan bis',
+                                'Parc Leucate 2', 'Bouzigues (a)', 'Sète mer',
+                                'Diana centre')),
+                            aes(x = Year, y = Day, color = Code_point_Libelle),
+                            method = 'lm', alpha = .18) +
+  # new color scale for the points
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  # aesthetics
+  facet_wrap(facets = 'Code_point_Libelle', nrow = 4) +
+  scale_y_continuous(limits = c(1, 365), 
+                     breaks = c(1, 100, 200, 300, 365)) +
+  scale_shape_discrete(guide = 'none') +
+  # scale_shape_manual(values = c(1, 3), guide = 'none') +
+  # labels
+  labs(y = 'Day of maximum Dinophysis count') +
+  theme_classic()
+
+# We have some problems ar Parc Leucate 2: the maxima are cut in 2 groups
+# because they occur around the 1st of January.
+# To fix this, we need to "cut" the seasonality so that maxima in winter don't get 
+# separated artificially. Let's do this by setting the first day of our new year
+# as day 25.
+
+# UPDATE : with the modification of the code on 2025/08/12, this is no longer a 
+# viable solution, because it fcks up the other Med sites.
+# Hence, the NewDay variable creation is deactivated (see just below). The
+# "solution" is to NOT fit a linear model into the winter peak at Parc Leucate
+# (see plot command)
+# VP
+
+# Maxima_Dino_2 <- Maxima_Dino_2 %>%
+#   # We'll go from 36 to 401 (in our new system)
+#   mutate(NewDay = ifelse(Day <= 35, Day + 365, Day))
+
+# Same plot as before but with NewDay as x
+ggplot(Maxima_Dino_2, 
+       aes(x = Year, y = Day, color = Code_point_Libelle, 
+           shape = as.factor(period))) +
+  # First the points
+  geom_point(size = 2.5, alpha = .8) +
+  # then add linear regression fit for some sites only
+  geom_smooth(data = subset(Maxima_Dino_2,
+                            Code_point_Libelle %in% 
+                              c('Antifer ponton pétrolier', 'Cabourg',
+                                'Men er Roue', 'Ouest Loscolo',
+                                'Le Cornard', 'Auger',
+                                'Arcachon - Bouée 7', 'Teychan bis',
+                                'Bouzigues (a)', 'Sète mer',
+                                'Diana centre')),
+              aes(x = Year, y = Day, color = Code_point_Libelle),
+              method = 'lm', alpha = .25, linewidth = .5) +
+  # Special one for Parc Leucate
+  geom_smooth(data = subset(Maxima_Dino_2,
+                            Code_point_Libelle == 'Parc Leucate 2' &
+                              period == 1),
+              aes(x = Year, y = Day),color = '#642C3A',
+              method = 'lm', alpha = .25, linewidth = .5) +
+  # new color scale for the points
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  # aesthetics
+  facet_wrap(facets = 'Code_point_Libelle', nrow = 4) +
+  scale_y_continuous(limits = c(1, 365), 
+                     breaks = c(1, 100, 200, 300, 365)) +
+  scale_shape_discrete(guide = 'none') +
+  # scale_shape_manual(values = c(1, 3), guide = 'none') +
+  # labels
+  labs(y = 'Day of maximum Dinophysis count (DOY)') +
+  theme_classic()
+
+# This seems pretty good!
+# Let's save that
+# ggsave('Plots/REPHY/Maxima_Dinophysis_16_sites.tiff',
+#        dpi = 300, height = 125, width = 164, units = 'mm', compression = 'lzw')
 
 #### Hovmoller diagrams ####
 
