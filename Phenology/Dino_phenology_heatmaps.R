@@ -1,8 +1,8 @@
 #### Temperature and salinity heatmaps for Dinophysis phenology ##
 ## V. POCHIC
-# 2024/10/03
+# 2025/08/12
 # --> Now with only the sites selected for phenology analysis
-# (The Channel-Atlantic coast) and with Chl a
+# (The Channel-Atlantic coast) and with Chl a (curated values - no hplc)
 
 ### Packages ####
 
@@ -13,7 +13,7 @@ library(RColorBrewer)
 library(cmocean)
 
 ### Import data ####
-Table_hydro <- read.csv2('Table1_hydro_select.csv', header = TRUE, fileEncoding = "ISO-8859-1")
+Table_hydro <- read.csv2('Table1_hydro_select_20250812.csv', header = TRUE, fileEncoding = "ISO-8859-1")
 
 # Select only stations of interest from 2007 --> 2022
 Table_hydro_select <- filter(Table_hydro, Code_point_Libelle %in% 
@@ -152,9 +152,10 @@ Table_hydro_select <- Table_hydro_select %>%
                                           'Antifer ponton pétrolier', 'Cabourg',
                                           'Men er Roue', 'Ouest Loscolo',
                                           'Le Cornard', 'Auger',
-                                          'Arcachon - Bouée 7', 'Teychan bis',
-                                          'Parc Leucate 2', 'Bouzigues (a)',
-                                          'Sète mer', 'Diana centre'))
+                                          'Arcachon - Bouée 7', 'Teychan bis'#,
+                                          # 'Parc Leucate 2', 'Bouzigues (a)',
+                                          # 'Sète mer', 'Diana centre'
+                                          ))
   
 # Plot aesthetics
 pheno_palette12 <- c('red3', 'orangered1', 'dodgerblue4', 'dodgerblue1', 
@@ -502,7 +503,7 @@ Table_hydro_fortnightly <- Table_hydro_select %>%
   filter(Fortnight < 27)
 
 # Write that down!
-# write.csv2(Table_hydro_fortnightly, 'Table_hydro_fortnightly_20240821.csv',
+# write.csv2(Table_hydro_fortnightly, 'Table_hydro_fortnightly_20250812.csv',
 #            row.names = FALSE, fileEncoding = "ISO-8859-1")
 
 # Now let's plot that as a heatmap
