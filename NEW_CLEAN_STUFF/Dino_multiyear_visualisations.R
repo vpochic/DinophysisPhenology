@@ -790,6 +790,89 @@ ggplot(Maxima_Dino_2_stats_select) +
 # ggsave('Plots/REPHY/Dino_max_chla.tiff', dpi = 300, height = 180, width = 150,
 #        units = 'mm', compression = 'lzw')
 
+####
+
+## What if instead of mean+-sd, we plot the peaks of the GAM? ##
+
+# Summarise GAM data to remove the year
+GAM_peak_plot <- GAM_peak_select2 %>%
+  filter(Day < 300) %>%
+  group_by(Code_point_Libelle, period) %>%
+  summarise(Daymax = mean(Day), .groups = 'keep')
+
+GAM_peak_plot <- left_join(GAM_peak_plot, Maxima_Dino_2_stats_select,
+                           by = c('Code_point_Libelle', 'period')) %>%
+  filter(Code_point_Libelle %in%
+           c('Antifer ponton pétrolier', 'Cabourg',
+             'Men er Roue', 'Ouest Loscolo',
+             'Le Cornard', 'Auger',
+             'Arcachon - Bouée 7', 'Teychan bis'))
+
+# And new version of the plot
+ggplot(GAM_peak_plot) +
+  geom_tile(data = Table_hydro_daily_select, 
+            aes(x = Day, y = Code_point_Libelle, fill = TEMP.med), #fill = CHLOROA.med
+            alpha = .8) +
+  # color palette for fill
+  # Temperature version
+  scale_fill_distiller(palette = 'RdBu', direction = -1) +
+  # Chl a version
+  # scale_fill_cmocean(name = 'algae') +
+  
+  # Add labels here so the name of the 'fill' legend is correct
+  # Labels (for chla plot fill = 'Median [chl a] (mg/m3)')
+  labs(x = 'Day of the year', y = NULL, fill = 'Median SST (°C)',
+       title = 'Maxima of Dinophysis counts (2007-2022)') +
+  
+  # New fill scale for points
+  new_scale_fill() +
+  
+  # All maxima as smaller translucid points
+  geom_point(data = Maxima_Dino_select, aes(x = Day, y = Code_point_Libelle, 
+                                            color = Code_point_Libelle), 
+             size = 2.5, alpha = .5) +
+  
+  # points for GAM peak
+  geom_point(aes(y = Code_point_Libelle, x = Daymax, 
+                 fill = Code_point_Libelle), size = 4, color = 'grey10',
+             shape = 21, stroke = .5) +
+  
+  # Color scales
+  scale_color_discrete(type = pheno_palette8, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette8, guide = 'none') +
+  
+  # Axis stuff
+  # reverse y axis to get sites in the desired order
+  scale_y_discrete(limits = rev) +
+  scale_x_continuous(limits = c(1,365), breaks = c(1, 100, 200, 300, 365)) +
+  
+  # Theme
+  theme(plot.title = element_text(size = 11), 
+        # Axis
+        axis.title.x = element_text(size=10), 
+        axis.title.y =element_text(size=10), 
+        axis.text = element_text(size=8, color = 'black'),
+        axis.line.x = element_line(linewidth = .2, color = 'black'),
+        axis.line.y = element_line(linewidth = .2, color = 'black'),
+        # Legend
+        legend.background = element_rect(linewidth = .5, color = 'grey10'),
+        legend.title = element_text(size = 10, color = 'grey5'),
+        legend.frame = element_rect(linewidth = .5, color = 'grey10'),
+        legend.ticks = element_line(linewidth = .2, color = 'grey25'),
+        legend.position = 'bottom',
+        # Panel
+        panel.grid = element_blank(),
+        panel.background = element_blank(),
+        # Facet labels
+        strip.background = element_rect(fill = 'transparent',
+                                        linewidth = 1,
+                                        color = 'grey10'),
+        strip.text = element_text(color = 'grey5', size = 7.5))
+
+# Great! Let's save that
+# ggsave('Plots/REPHY/Dino_gam_max_temp.tiff', dpi = 300, height = 180, width = 150,
+#        units = 'mm', compression = 'lzw')
+
 ### Plotting maxima by latitude ####
 
 ggplot() +
