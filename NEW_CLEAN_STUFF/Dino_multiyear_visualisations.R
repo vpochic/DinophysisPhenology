@@ -646,7 +646,19 @@ ggplot(data = subset(Season_Dino_region, Code.Region < 30)) +
 
 Table_hydro_daily <- read.csv2('Data/REPHY_outputs/Table_hydro_daily_20240821.csv', 
                                header = TRUE,
-                               fileEncoding = 'ISO-8859-1')
+                               fileEncoding = 'ISO-8859-1') %>%
+  # Erase the chl a values that are improper
+  select(-c('CHLOROA.med', 'CHLOROA.mean'))
+
+# Now call the fortinightly table with the right values
+Table_hydro_fortnightly <- read.csv2('Data/REPHY_outputs/Table_hydro_fortnightly_20250812.csv', 
+                                     header = TRUE,
+                                     fileEncoding = 'ISO-8859-1')
+
+# Aaaaand... left_join
+Table_hydro_daily <- left_join(Table_hydro_daily, Table_hydro_fortnightly)
+
+# Great!
 
 # Now, we plot! First, what we want to do is to have an idea of the distribution
 # of Dinophysis maxima for each site. We will focus on Channel/Atlantic sites,
@@ -710,17 +722,17 @@ ggplot(Maxima_Dino_2_stats_select, aes(color = Code_point_Libelle)) +
 # (2 versions of the plot)
 ggplot(Maxima_Dino_2_stats_select) +
   geom_tile(data = Table_hydro_daily_select, 
-            aes(x = Day, y = Code_point_Libelle, fill = TEMP.med), #fill = CHLOROA.med
+            aes(x = Day, y = Code_point_Libelle, fill = CHLOROA.med), #fill = TEMP.med
             alpha = .8) +
   # color palette for fill
   # Temperature version
-  scale_fill_distiller(palette = 'RdBu', direction = -1) +
+  # scale_fill_distiller(palette = 'RdBu', direction = -1) +
   # Chl a version
-  # scale_fill_cmocean(name = 'algae') +
+  scale_fill_cmocean(name = 'algae') +
   
   # Add labels here so the name of the 'fill' legend is correct
-  # Labels (for chl a plot fill = 'Median [chl a] (mg/m3)')
-  labs(x = 'Day of the year', y = NULL, fill = 'Median SST (°C)',
+  # Labels (for TEMP plot fill = 'Median SST (°C)')
+  labs(x = 'Day of the year', y = NULL, fill = 'Median [chl a] (mg/m3)',
        title = 'Maxima of Dinophysis counts (2007-2022)') +
   
   # New fill scale for points
@@ -775,7 +787,7 @@ ggplot(Maxima_Dino_2_stats_select) +
         strip.text = element_text(color = 'grey5', size = 7.5))
 
 # Nice one. Let's save that
-# ggsave('Dino_max_temp.tiff', dpi = 300, height = 180, width = 150,
+# ggsave('Plots/REPHY/Dino_max_chla.tiff', dpi = 300, height = 180, width = 150,
 #        units = 'mm', compression = 'lzw')
 
 ### Plotting maxima by latitude ####
