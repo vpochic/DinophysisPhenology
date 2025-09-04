@@ -1,6 +1,6 @@
 ### GAMs of pigment concentrations ###
 # Part of the Dinophysis Phenology project
-# V. POCHIC 2025-07-22
+# V. POCHIC 2025-09-04
 
 ### Required packages ####
 
@@ -424,6 +424,116 @@ ggplot() +
 # Save the plot (even if the model seems not ideal for MeR)
 # ggsave('Plots/GAMs/Pigments/GAM_chla_4sites.tiff', height = 150, width = 150,
 #        units = 'mm', dpi = 300, compression = 'lzw')
+
+### BONUS GAM of chl a with spectrometry measurements NOT FUNCTIONAL ####
+
+# NOT FUNCTIONAL AS OF 2025/08/12
+
+# The point of this GAM is to examine the seasonality of chl a in the different
+# regions and see if it relates to the differences in Dinophysis phenology
+
+## Import data ###
+Table_chla2 <- read.csv2('Data/REPHY_outputs/Table1_hydro_select_20250812.csv',
+                        header = TRUE, fileEncoding = 'ISO-8859-1') %>%
+  # Years 2007 -> 2022
+  filter(Year >= 2007 & Year <= 2022) %>%
+  # Filter out missing measurements (or impossible ones)
+  filter(is.na(CHLOROA) == FALSE & CHLOROA != 0) %>%
+  # Select the relevant sampling sites, and reorder them as factor
+  filter(Code_point_Libelle %in% c('Point 1 Boulogne', 'At so',
+                                   'Antifer ponton pétrolier', 'Cabourg',
+                                   'les Hébihens', 'Loguivy',
+                                   'Men er Roue', 'Ouest Loscolo',
+                                   'Le Cornard', 'Auger',
+                                   'Arcachon - Bouée 7', 'Teychan bis',
+                                   'Parc Leucate 2', 'Bouzigues (a)',
+                                   'Sète mer', 'Diana centre')) %>%
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis',
+                                          'Parc Leucate 2', 'Bouzigues (a)',
+                                          'Sète mer', 'Diana centre')) %>%
+  # Adjust the date format, create a Day and Year variables
+  mutate(Date = ymd(Date)) %>%
+  mutate(Year = year(Date)) %>%
+  mutate(Day = yday(Date))
+
+## GAM ###
+Table_chla2_factor <- Table_chla2 %>%
+  mutate(Year = as_factor(Year))
+
+gam_chla2 <- gam(data = Table_chla2, 
+                   # Only a spline for the day of the year
+                   # The use of a cyclic basis spline helps to make ends meet at the
+                   # first and last days of the year
+                   # 'k = 7' allows the model use 7 basic functions at most.
+                   # This ensures that the model isn't too wiggly.
+                   formula = CHLOROA~s(Day, bs = 'cc', k = 10,
+                                       # separate each site
+                                       by = Code_point_Libelle) 
+                   # We add the Year as a random effect. This will help to assess and
+                   # smooth the effects of interannual variability in the phenology
+                   + s(Year, bs = 're', k = -1),
+                   # Using a Gamma distribution (close to a normal distribution)
+                   family = Gamma(),
+                   # Restricted maximum likelihood estimation (recommended method)
+                   method = 'REML')
+
+summary(gam_chla2)
+gam.check(gam_chla2)
+
+# Create a new 'empty' dataset for storing model prediction (fit)
+gam_chla2_newdata <- expand_grid(Day=seq(1, 365),
+                                   # We add a Year vector as it has become a factor
+                                   # of the model
+                                   Year=seq(min(Table_chla2$Year), 
+                                            max(Table_chla2$Year)),
+                                   # We also add the site data
+                                   Code_point_Libelle = unique(Table_chla2$Code_point_Libelle))
+
+## Get the inverse link function of the model
+# With this function, we can transform the prediction we make on the link
+#scale to the response scale
+ilink <- gam_chla2$family$linkinv
+
+## Predict : add fit and se.fit on the **link** scale
+gam_chla2_newdata <- bind_cols(gam_chla2_newdata, 
+                                 setNames(as_tibble(
+                                   predict(gam_chla2, gam_chla2_newdata, 
+                                           se.fit = TRUE, type = 'link')[1:2]),
+                                   c('fit_link','se_link')))
+
+## Create the 95% confidence interval (2*standard error fit) and backtransform 
+# to response variable using the inverse link function
+gam_chla2_newdata <- mutate(gam_chla2_newdata,
+                              fit_resp  = ilink(fit_link),
+                              right_upr = ilink(fit_link + (2 * se_link)),
+                              right_lwr = ilink(fit_link - (2 * se_link)))
+# Check the confidence interval. It should not extend below 0 (negative chla
+# values are impossible). But it does (slightly), and i don't know what to do about it.
+min(gam_chla2_newdata$right_lwr) # Not negative :)
+min(gam_chla2_newdata$fit_resp)
+max(gam_chla2_newdata$right_upr)
+max(gam_chla2_newdata$fit_resp)
+
+# First plot
+
+ggplot(gam_chla2_newdata, aes(x = Day, y = fit_resp))+
+  geom_ribbon(aes(x=Day, ymin=right_lwr, ymax=right_upr), fill = 'grey70', alpha=0.7) +
+  geom_line(linewidth = 1) +
+  geom_point(data = Table_chla2, aes(x = Day, y = CHLOROA, color = Year), shape = 21) +
+  scale_color_viridis_c('Year') +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  theme_classic()
+
+### Checking the model
+ModelOutputs<-data.frame(Fitted=fitted(gam_chla2),
+                         Residuals=resid(gam_chla2))
 
 ### GAM of Alloxanthin ####
 
@@ -1024,6 +1134,45 @@ Season_Allo_MeR <- filter(Table_Allo_factor, Code_point_Libelle == 'Men er Roue'
 Season_Allo_OL <- filter(Table_Allo_factor, Code_point_Libelle == 'Ouest Loscolo')
 
 
+# Satellite data ####
+# Ok nice. Now we'll try to add dots for satellite observations of Mesodinium
+# blooms in the regions of interest.
+
+# Loire Vilaine
+Satellite_survey_LV <- read.csv2('Data/Satellite/Blooms_list_satellite_Vilaine-Gironde.csv',
+                              header = TRUE, fileEncoding = 'ISO-8859-1')
+
+# Let's focus on Mesodinium in the Loire-Atlantique region
+Satellite_survey_Meso_LV <- filter(Satellite_survey,
+                                (grepl('Mesodinium', Main.species) |
+                                   grepl('Mesodinium', Comment)) &
+                                  Region == 'Loire Atlantique') %>%
+  # Add the date information that we will need for plotting
+  mutate(Date = ymd(Date)) %>%
+  mutate(Year = year(Date)) %>%
+  mutate(Day = yday(Date)) %>%
+  # Finally, add a false "true_count" value for plotting alongside the Dinophysis
+  # phenology
+  mutate(true_count = 50) %>%
+  select(-c(7:11))
+
+# Seine Bay
+Satellite_survey_SB <- read.csv2('Data/Satellite/Blooms_list_satellite_Seine_Bay_incomplete.csv',
+                                 header = TRUE, fileEncoding = 'ISO-8859-1') %>%
+  # Add the date information that we will need for plotting
+  mutate(Date = ymd(Date)) %>%
+  mutate(Year = year(Date)) %>%
+  mutate(Day = yday(Date)) %>%
+  # Finally, add a false "true_count" value for plotting alongside the Dinophysis
+  # phenology
+  mutate(true_count = 50)
+
+### Join both datasets
+Satellite_survey_Meso <- bind_rows(Satellite_survey_Meso_LV, Satellite_survey_SB) %>%
+  # Attribute a Code_point_Libelle value to facilitate plotting
+  mutate(Code_point_Libelle = ifelse(Region == 'Loire Atlantique', 'Ouest Loscolo',
+                                     'Cabourg'))
+
 ### Plots ####
 
 pheno_palette4 <- c('red3', 'orangered', 
@@ -1314,3 +1463,228 @@ ggarrange(succession_Cab, succession_OL, nrow = 1,
 
 # ggsave('Plots/Figures_article/version_1/Figure5_succession_plot_Cab_OL.tiff',
 #        width = 164, height = 170, units = 'mm', dpi = 300, compression = 'lzw')
+
+## Cabourg + Ouest Loscolo (video style) ####
+
+## Ouest Loscolo
+# Dinophysis
+plot_Dino_OL <- ggplot() +
+  # plot the data as points
+  geom_point(data = Season_Dino_OL, aes(x = Day, y = true_count*100), size = 2,
+             alpha = .5, color = '#2156A1') +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_OL, aes(x = Day, ymin = lwrS*100, 
+                                      ymax = uprS*100),
+              linewidth = .35, alpha = .18,
+              color = '#2156A1', fill = '#2156A1') +
+  geom_line(data = gam_Dino_OL, aes(x = Day, y = median.fit*100),
+            linewidth = .7, color = '#2156A1') +
+  scale_y_continuous(limits = c(0,19000)) +
+  # Text
+  labs(subtitle = '', 
+       x = NULL, y = NULL) + # subtitle = 'Dinophysis (cells counted)', 
+  theme_classic()
+
+plot_Dino_OL
+
+# With Mesodinium data
+plot_Dino_Meso_OL <- ggplot() +
+  
+  ## Meso
+  # plot the data as points
+  geom_point(data = Season_Meso_OL, aes(x = Day, y = true_count*100), size = 2,
+             alpha = .15, color = '#5995E3') +
+  # plot the GAM
+  geom_ribbon(data = gam_Meso_OL, aes(x = Day, ymin = lwrS*100, 
+                                      ymax = uprS*100),
+              linewidth = .35, alpha = .1,
+              color = '#5995E3', fill = '#5995E3') +
+  geom_line(data = gam_Meso_OL, aes(x = Day, y = median.fit*100),
+            linewidth = .7, color = '#5995E3', alpha = .4) +
+  
+  ## Dino
+  # plot the data as points
+  geom_point(data = Season_Dino_OL, aes(x = Day, y = true_count*100), size = 2,
+             alpha = .5, color = '#2156A1') +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_OL, aes(x = Day, ymin = lwrS*100, 
+                                      ymax = uprS*100),
+              linewidth = .35, alpha = .18,
+              color = '#2156A1', fill = '#2156A1') +
+  geom_line(data = gam_Dino_OL, aes(x = Day, y = median.fit*100),
+            linewidth = .7, color = '#2156A1') +
+  # y-axis scale
+  scale_y_continuous(limits = c(0,19000)) +
+  # Text
+  labs(subtitle = '',
+       x = NULL, # subtitle = 'Mesodinium (cells counted)',
+       y = NULL) +
+  theme_classic()
+
+plot_Dino_Meso_OL
+
+# With satellite data!
+# With Mesodinium data
+plot_Dino_Meso_OL_sat <- ggplot() +
+  
+  ## Meso
+  # plot the data as points
+  geom_point(data = Season_Meso_OL, aes(x = Day, y = true_count*100), size = 2,
+             alpha = .15, color = '#5995E3') +
+  # plot the GAM
+  geom_ribbon(data = gam_Meso_OL, aes(x = Day, ymin = lwrS*100, 
+                                      ymax = uprS*100),
+              linewidth = .35, alpha = .1,
+              color = '#5995E3', fill = '#5995E3') +
+  geom_line(data = gam_Meso_OL, aes(x = Day, y = median.fit*100),
+            linewidth = .7, color = '#5995E3', alpha = .4) +
+  
+  ## Dino
+  # plot the data as points
+  geom_point(data = Season_Dino_OL, aes(x = Day, y = true_count*100), size = 2,
+             alpha = .5, color = '#2156A1') +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_OL, aes(x = Day, ymin = lwrS*100, 
+                                      ymax = uprS*100),
+              linewidth = .35, alpha = .18,
+              color = '#2156A1', fill = '#2156A1') +
+  geom_line(data = gam_Dino_OL, aes(x = Day, y = median.fit*100),
+            linewidth = .7, color = '#2156A1') +
+  
+  # Satellite observations of Mesodinium blooms
+  geom_point(data = subset(Satellite_survey_Meso, Code_point_Libelle == 'Ouest Loscolo'),
+             aes(x = Day, y = true_count*300),
+             color = 'firebrick4', shape = 8, size = 3.5, stroke = .45) +
+  
+  # y-axis scale
+  scale_y_continuous(limits = c(0,19000)) +
+  # Text
+  labs(subtitle = '',
+       x = NULL, # subtitle = 'Mesodinium (cells counted)',
+       y = NULL) +
+  theme_classic()
+
+plot_Dino_Meso_OL_sat
+
+## Cabourg
+# Dinophysis
+plot_Dino_Cab <- ggplot() +
+  # plot the data as points
+  geom_point(data = Season_Dino_Cabourg, aes(x = Day, y = true_count*100), size = 2,
+             alpha = .5, color = 'red3') +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_Cabourg, aes(x = Day, ymin = lwrS*100, 
+                                      ymax = uprS*100),
+              linewidth = .35, alpha = .18,
+              color = 'red3', fill = 'red3') +
+  geom_line(data = gam_Dino_Cabourg, aes(x = Day, y = median.fit*100),
+            linewidth = .7, color = 'red3') +
+  scale_y_continuous(limits = c(0,9000)) +
+  # Text
+  labs(subtitle = '', 
+       x = NULL, y = NULL) + # subtitle = 'Dinophysis (cells counted)', 
+  theme_classic()
+
+plot_Dino_Cab
+
+# With Mesodinium data
+plot_Dino_Meso_Cab <- ggplot() +
+  
+  ## Meso
+  # plot the data as points
+  geom_point(data = Season_Meso_Cabourg, aes(x = Day, y = true_count*100), size = 2,
+             alpha = .15, color = 'orangered') +
+  # plot the GAM
+  geom_ribbon(data = gam_Meso_Cabourg, aes(x = Day, ymin = lwrS*100, 
+                                      ymax = uprS*100),
+              linewidth = .35, alpha = .1,
+              color = 'orangered', fill = 'orangered') +
+  geom_line(data = gam_Meso_Cabourg, aes(x = Day, y = median.fit*100),
+            linewidth = .7, color = 'orangered', alpha = .4) +
+  
+  ## Dino
+  # plot the data as points
+  geom_point(data = Season_Dino_Cabourg, aes(x = Day, y = true_count*100), size = 2,
+             alpha = .5, color = 'red3') +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_Cabourg, aes(x = Day, ymin = lwrS*100, 
+                                           ymax = uprS*100),
+              linewidth = .35, alpha = .18,
+              color = 'red3', fill = 'red3') +
+  geom_line(data = gam_Dino_Cabourg, aes(x = Day, y = median.fit*100),
+            linewidth = .7, color = 'red3') +
+  # y-axis scale
+  scale_y_continuous(limits = c(0,9000)) +
+  # Text
+  labs(subtitle = '',
+       x = NULL, # subtitle = 'Mesodinium (cells counted)',
+       y = NULL) +
+  theme_classic()
+
+plot_Dino_Meso_Cab
+
+# With satellite data!
+plot_Dino_Meso_Cab_sat <- ggplot() +
+  
+  ## Meso
+  # plot the data as points
+  geom_point(data = Season_Meso_Cabourg, aes(x = Day, y = true_count*100), size = 2,
+             alpha = .15, color = 'orangered') +
+  # plot the GAM
+  geom_ribbon(data = gam_Meso_Cabourg, aes(x = Day, ymin = lwrS*100, 
+                                           ymax = uprS*100),
+              linewidth = .35, alpha = .1,
+              color = 'orangered', fill = 'orangered') +
+  geom_line(data = gam_Meso_Cabourg, aes(x = Day, y = median.fit*100),
+            linewidth = .7, color = 'orangered', alpha = .4) +
+  
+  ## Dino
+  # plot the data as points
+  geom_point(data = Season_Dino_Cabourg, aes(x = Day, y = true_count*100), size = 2,
+             alpha = .5, color = 'red3') +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_Cabourg, aes(x = Day, ymin = lwrS*100, 
+                                           ymax = uprS*100),
+              linewidth = .35, alpha = .18,
+              color = 'red3', fill = 'red3') +
+  geom_line(data = gam_Dino_Cabourg, aes(x = Day, y = median.fit*100),
+            linewidth = .7, color = 'red3') +
+  
+  # Satellite observations of Mesodinium blooms
+  geom_point(data = subset(Satellite_survey_Meso, Code_point_Libelle == 'Cabourg'),
+             aes(x = Day, y = true_count*150),
+             color = 'firebrick4', shape = 8, size = 3.5, stroke = .45) +
+  
+  # y-axis scale
+  scale_y_continuous(limits = c(0,9000)) +
+  # Text
+  labs(subtitle = '',
+       x = NULL, # subtitle = 'Mesodinium (cells counted)',
+       y = NULL) +
+  theme_classic()
+
+plot_Dino_Meso_Cab_sat
+
+### Arrange the different plots by pairs
+
+# Only Dino
+ggarrange(plot_Dino_Cab, plot_Dino_OL, nrow = 1,
+          align = 'h')
+
+# ggsave('Plots/Video/Succession_Dino.tiff', height = 80, width = 150, units = 'mm',
+#        dpi = 600, compression = 'lzw')
+
+# Dino and Meso
+ggarrange(plot_Dino_Meso_Cab, plot_Dino_Meso_OL, nrow = 1,
+          align = 'h')
+
+# ggsave('Plots/Video/Succession_Dino_Meso.tiff', height = 80, width = 150, units = 'mm',
+#        dpi = 600, compression = 'lzw')
+
+# Dino, Meso and satellite
+ggarrange(plot_Dino_Meso_Cab_sat, plot_Dino_Meso_OL_sat, nrow = 1,
+          align = 'h')
+
+# ggsave('Plots/Video/Succession_Dino_Meso_sat.tiff', height = 80, width = 150, units = 'mm',
+#        dpi = 600, compression = 'lzw')
+
