@@ -1143,7 +1143,7 @@ Satellite_survey_LV <- read.csv2('Data/Satellite/Blooms_list_satellite_Vilaine-G
                               header = TRUE, fileEncoding = 'ISO-8859-1')
 
 # Let's focus on Mesodinium in the Loire-Atlantique region
-Satellite_survey_Meso_LV <- filter(Satellite_survey,
+Satellite_survey_Meso_LV <- filter(Satellite_survey_LV,
                                 (grepl('Mesodinium', Main.species) |
                                    grepl('Mesodinium', Comment)) &
                                   Region == 'Loire Atlantique') %>%
@@ -1172,6 +1172,17 @@ Satellite_survey_Meso <- bind_rows(Satellite_survey_Meso_LV, Satellite_survey_SB
   # Attribute a Code_point_Libelle value to facilitate plotting
   mutate(Code_point_Libelle = ifelse(Region == 'Loire Atlantique', 'Ouest Loscolo',
                                      'Cabourg'))
+
+# Survey from RIOVILO Cruise (2 points in August 2025)
+Boat_survey_Meso <- read.csv('Data/Satellite/Mesodinium_RIOVILO_survey.csv', 
+                             header = TRUE, sep = ';', fileEncoding = 'ISO-8859-1') %>%
+  # Add the date information that we will need for plotting
+  mutate(Date = ymd(Date)) %>%
+  mutate(Year = year(Date)) %>%
+  mutate(Day = yday(Date)) %>%
+  # Finally, add a false "true_count" value for plotting alongside the Dinophysis
+  # phenology
+  mutate(true_count = 50)
 
 ### Plots ####
 
@@ -1524,7 +1535,6 @@ plot_Dino_Meso_OL <- ggplot() +
 plot_Dino_Meso_OL
 
 # With satellite data!
-# With Mesodinium data
 plot_Dino_Meso_OL_sat <- ggplot() +
   
   ## Meso
@@ -1565,6 +1575,7 @@ plot_Dino_Meso_OL_sat <- ggplot() +
   theme_classic()
 
 plot_Dino_Meso_OL_sat
+
 
 ## Cabourg
 # Dinophysis
@@ -1688,3 +1699,58 @@ ggarrange(plot_Dino_Meso_Cab_sat, plot_Dino_Meso_OL_sat, nrow = 1,
 # ggsave('Plots/Video/Succession_Dino_Meso_sat.tiff', height = 80, width = 150, units = 'mm',
 #        dpi = 600, compression = 'lzw')
 
+### Version for RIOMAR advisory board ####
+
+# With satellite data!
+plot_Dino_Meso_OL_sat <- ggplot() +
+  
+  ## Meso
+  # plot the data as points
+  geom_point(data = Season_Meso_OL, aes(x = Day, y = true_count*100), size = 2,
+             alpha = .15, color = '#5995E3') +
+  # plot the GAM
+  geom_ribbon(data = gam_Meso_OL, aes(x = Day, ymin = lwrS*100, 
+                                      ymax = uprS*100),
+              linewidth = .35, alpha = .1,
+              color = '#5995E3', fill = '#5995E3') +
+  geom_line(data = gam_Meso_OL, aes(x = Day, y = median.fit*100),
+            linewidth = .7, color = '#5995E3', alpha = .4) +
+  
+  ## Dino
+  # plot the data as points
+  geom_point(data = Season_Dino_OL, aes(x = Day, y = true_count*100), size = 2,
+             alpha = .5, color = '#2156A1') +
+  # plot the GAM
+  geom_ribbon(data = gam_Dino_OL, aes(x = Day, ymin = lwrS*100, 
+                                      ymax = uprS*100),
+              linewidth = .35, alpha = .18,
+              color = '#2156A1', fill = '#2156A1') +
+  geom_line(data = gam_Dino_OL, aes(x = Day, y = median.fit*100),
+            linewidth = .7, color = '#2156A1') +
+  
+  # Satellite observations of Mesodinium blooms
+  geom_point(data = subset(Satellite_survey_Meso, Code_point_Libelle == 'Ouest Loscolo'),
+             aes(x = Day, y = true_count*300),
+             color = 'firebrick4', shape = 8, size = 3.5, stroke = .45) +
+  
+  # Mesodinium bloom observed during RIOVILO cruise
+  geom_point(data = Boat_survey_Meso,
+             aes(x = Day, y = true_count*300),
+             color = 'firebrick4', shape = 21, size = 3.5, stroke = .45) +
+  geom_point(data = Boat_survey_Meso,
+             aes(x = Day, y = true_count*300),
+             color = 'firebrick4', shape = 4, size = 2.5, stroke = .45) +
+  
+  # y-axis scale
+  scale_y_continuous(limits = c(0,19000)) +
+  # Text
+  labs(title = 'Phenology of Dinophysis and its prey in the Loire-Vilaine region',
+       x = 'Day of the year', # subtitle = 'Mesodinium (cells counted)',
+       y = 'Cells per L') +
+  theme_classic()
+
+plot_Dino_Meso_OL_sat
+
+# Save that
+ggsave('Plots/Video/Succession_DinoMeso_RIOMAR_AB.tiff',
+       height = 90, width = 164, units = 'mm', dpi = 300, compression = 'lzw')
