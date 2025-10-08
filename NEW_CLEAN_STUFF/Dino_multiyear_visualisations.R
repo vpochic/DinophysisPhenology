@@ -1,6 +1,6 @@
 ###### Dinophysis phenology: visualisations on multiple years ###
 ## V. POCHIC
-# 2025-08-12
+# 2025-10-03
 
 # Additional visualisations using the results of GAM, REPHY data and satellite
 # observations, to observe Dinophysis dynamics over several years
@@ -640,9 +640,11 @@ ggplot(data = subset(Season_Dino_region, Code.Region < 30)) +
 
 ### Environmental data ####
 
+### Import data -----------
+
 ## Here we will call a table of environmental data to plot a heatmap
 # underneath our Dinophysis data
-# This table was created by the script "Dino_phenology_heatmaps.R"
+# This table was created by an earlier script
 
 Table_hydro_daily <- read.csv2('Data/REPHY_outputs/Table_hydro_daily_20240821.csv', 
                                header = TRUE,
@@ -660,6 +662,20 @@ Table_hydro_daily <- left_join(Table_hydro_daily, Table_hydro_fortnightly)
 
 # Great!
 
+## Now, we will import the stratification data from the GAMAR model (summarised
+# by fortnight)
+Table_stratif_fortnightly <- read.csv2('Data/Models/GAMAR/Outputs/Table_stratif_fortnightly.csv', 
+          header = TRUE, fileEncoding = 'ISO-8859-1')
+
+# Create a daily table
+Table_daily <- select(Table_hydro_daily, c('Day', 'Fortnight', 
+                                           'Code_point_Libelle'))
+
+Table_stratif_daily <- left_join(Table_daily, Table_stratif_fortnightly,
+                                 by = c('Fortnight', 'Code_point_Libelle'))
+
+# Excellent
+
 # Now, we plot! First, what we want to do is to have an idea of the distribution
 # of Dinophysis maxima for each site. We will focus on Channel/Atlantic sites,
 # and only those where we observe Dinophysis
@@ -669,6 +685,14 @@ Table_hydro_daily_select <- filter(Table_hydro_daily,
                                        'Men er Roue', 'Ouest Loscolo',
                                        'Le Cornard', 'Auger',
                                        'Arcachon - Bouée 7', 'Teychan bis'))
+
+Table_stratif_daily_select <- filter(Table_stratif_daily,
+                                   Code_point_Libelle %in%
+                                     c('Antifer ponton pétrolier', 'Cabourg',
+                                       'Men er Roue', 'Ouest Loscolo',
+                                       'Le Cornard', 'Auger',
+                                       'Arcachon - Bouée 7', 'Teychan bis'))
+
 Maxima_Dino_2_stats_select <- filter(Maxima_Dino_2_stats,
                                    Code_point_Libelle %in%
                                      c('Antifer ponton pétrolier', 'Cabourg',
@@ -681,6 +705,8 @@ Maxima_Dino_select <- filter(Maxima_Dino_2,
                                  'Men er Roue', 'Ouest Loscolo',
                                  'Le Cornard', 'Auger',
                                  'Arcachon - Bouée 7', 'Teychan bis'))
+
+### Plots ------
 
 # New color scale
 pheno_palette8 <- c('red3', 'orangered', '#2156A1', '#5995E3', 
@@ -718,21 +744,26 @@ ggplot(Maxima_Dino_2_stats_select, aes(color = Code_point_Libelle)) +
   labs(x = 'Day of the year', y = NULL) +
   theme_classic()
 
-# Now we try to underlie a heatmap of temperature/chl a seasonality 
-# (2 versions of the plot)
+# Now we try to underlie a heatmap of temperature/chl a/stratification/ssr seasonality 
+# (4 versions of the plot)
 ggplot(Maxima_Dino_2_stats_select) +
-  geom_tile(data = Table_hydro_daily_select, 
-            aes(x = Day, y = Code_point_Libelle, fill = CHLOROA.med), #fill = TEMP.med
+  geom_tile(data = Table_stratif_daily_select, # Table_hydro_daily_select
+            aes(x = Day, y = Code_point_Libelle, fill = SI_date.med), 
+            # fill = TEMP.med ; fill = CHLOROA.med ; fill = ssr.med
             alpha = .8) +
   # color palette for fill
+  # Stratification version
+  scale_fill_cmocean(name = 'deep', direction = 1) +
   # Temperature version
   # scale_fill_distiller(palette = 'RdBu', direction = -1) +
   # Chl a version
-  scale_fill_cmocean(name = 'algae') +
+  # scale_fill_cmocean(name = 'algae') +
   
   # Add labels here so the name of the 'fill' legend is correct
-  # Labels (for TEMP plot fill = 'Median SST (°C)')
-  labs(x = 'Day of the year', y = NULL, fill = 'Median [chl a] (mg/m3)',
+  # Labels (for TEMP plot fill = 'Median SST (°C)',
+  # Chl a: fill = 'Median [chl a] (mg/m3)',
+  # Stratif: fill = 'Median Stratification Index (-)')
+  labs(x = 'Day of the year', y = NULL, fill = 'Median Stratification Index (-)',
        title = 'Maxima of Dinophysis counts (2007-2022)') +
   
   # New fill scale for points
@@ -871,6 +902,232 @@ ggplot(GAM_peak_plot) +
 
 # Great! Let's save that
 # ggsave('Plots/REPHY/Dino_gam_max_temp.tiff', dpi = 300, height = 180, width = 150,
+#        units = 'mm', compression = 'lzw')
+
+### Alternative : plot only Seine Bay and Southern Brittany sites ###
+ggplot(subset(GAM_peak_plot, Code_point_Libelle %in% 
+                c('Antifer ponton pétrolier', 'Cabourg', 
+                  'Men er Roue', 'Ouest Loscolo'))) +
+  geom_tile(data = subset(Table_hydro_daily_select, Code_point_Libelle %in% 
+                            c('Antifer ponton pétrolier', 'Cabourg', 
+                              'Men er Roue', 'Ouest Loscolo')), 
+            aes(x = Day, y = Code_point_Libelle, fill = TEMP.med), #fill = CHLOROA.med
+            alpha = .8) +
+  # color palette for fill
+  # Temperature version
+  scale_fill_distiller(palette = 'RdBu', direction = -1) +
+  # Chl a version
+  # scale_fill_cmocean(name = 'algae') +
+  
+  # Add labels here so the name of the 'fill' legend is correct
+  # Labels (for chla plot fill = 'Median [chl a] (mg/m3)')
+  labs(x = 'Day of the year', y = NULL, fill = 'Median SST (°C)',
+       title = 'Maxima of Dinophysis counts (2007-2022)') +
+  
+  # New fill scale for points
+  new_scale_fill() +
+  
+  # All maxima as smaller translucid points
+  geom_point(data = subset(Maxima_Dino_select, Code_point_Libelle %in%
+                             c('Antifer ponton pétrolier', 'Cabourg', 
+                               'Men er Roue', 'Ouest Loscolo')), 
+             aes(x = Day, y = Code_point_Libelle, 
+                 color = Code_point_Libelle), 
+             size = 2.5, alpha = .5) +
+  
+  # points for GAM peak
+  geom_point(aes(y = Code_point_Libelle, x = Daymax, 
+                 fill = Code_point_Libelle), size = 4, color = 'grey10',
+             shape = 21, stroke = .5) +
+  
+  # Color scales
+  scale_color_discrete(type = pheno_palette8, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette8, guide = 'none') +
+  
+  # Axis stuff
+  # reverse y axis to get sites in the desired order
+  scale_y_discrete(limits = rev) +
+  scale_x_continuous(limits = c(1,365), breaks = c(1, 100, 200, 300, 365)) +
+  
+  # Theme
+  theme(plot.title = element_text(size = 11), 
+        # Axis
+        axis.title.x = element_text(size=10), 
+        axis.title.y =element_text(size=10), 
+        axis.text = element_text(size=8, color = 'black'),
+        axis.line.x = element_line(linewidth = .2, color = 'black'),
+        axis.line.y = element_line(linewidth = .2, color = 'black'),
+        # Legend
+        legend.background = element_rect(linewidth = .5, color = 'grey10'),
+        legend.title = element_text(size = 10, color = 'grey5'),
+        legend.frame = element_rect(linewidth = .5, color = 'grey10'),
+        legend.ticks = element_line(linewidth = .2, color = 'grey25'),
+        legend.position = 'bottom',
+        # Panel
+        panel.grid = element_blank(),
+        panel.background = element_blank(),
+        # Facet labels
+        strip.background = element_rect(fill = 'transparent',
+                                        linewidth = 1,
+                                        color = 'grey10'),
+        strip.text = element_text(color = 'grey5', size = 7.5))
+
+# ggsave('Plots/REPHY/Dino_gam_max_temp_4sites.tiff', dpi = 300, height = 135, width = 150,
+#        units = 'mm', compression = 'lzw')
+
+
+### Plotting the sites used in the Random Forest model ####
+
+Table_hydro_daily_RF <- filter(Table_hydro_daily,
+                                   Code_point_Libelle %in%
+                                     c('Point 1 Boulogne', 'At so',
+                                       'les Hébihens', 'Loguivy',
+                                       'Antifer ponton pétrolier', 'Cabourg',
+                                       'Men er Roue', 'Ouest Loscolo',
+                                       'Le Cornard',
+                                       'Arcachon - Bouée 7')) %>%
+  # Recode the Code_point_Libelle
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard',
+                                          'Arcachon - Bouée 7'))
+
+# Stratification
+Table_stratif_daily_RF <- filter(Table_stratif_daily,
+                               Code_point_Libelle %in%
+                                 c('Point 1 Boulogne', 'At so',
+                                   'les Hébihens', 'Loguivy',
+                                   'Antifer ponton pétrolier', 'Cabourg',
+                                   'Men er Roue', 'Ouest Loscolo',
+                                   'Le Cornard',
+                                   'Arcachon - Bouée 7')) %>%
+  # Recode the Code_point_Libelle
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard',
+                                          'Arcachon - Bouée 7'))
+
+# Dinophysis maxima (REPHY data)
+Maxima_Dino_2_stats_RF <- filter(Maxima_Dino_2_stats,
+                                     Code_point_Libelle %in%
+                                       c('Point 1 Boulogne', 'At so',
+                                         'les Hébihens', 'Loguivy',
+                                         'Antifer ponton pétrolier', 'Cabourg',
+                                         'Men er Roue', 'Ouest Loscolo',
+                                         'Le Cornard',
+                                         'Arcachon - Bouée 7'))
+Maxima_Dino_RF <- filter(Maxima_Dino_2,
+                             Code_point_Libelle %in%
+                               c('Point 1 Boulogne', 'At so',
+                                 'les Hébihens', 'Loguivy',
+                                 'Antifer ponton pétrolier', 'Cabourg',
+                                 'Men er Roue', 'Ouest Loscolo',
+                                 'Le Cornard', 'Arcachon - Bouée 7')) %>%
+  # Recode the Code_point_Libelle
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard',
+                                          'Arcachon - Bouée 7'))
+
+# New color scales
+pheno_palette10 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#F7B41D')
+pheno_palette6 <- c('red3', 'orangered', '#2156A1', '#5995E3', 
+                     '#1F3700', '#F7B41D')
+
+# New GAM peak table (without 2 sites)
+GAM_peak_plot_RF <- filter(GAM_peak_plot, Code_point_Libelle %in% 
+                            c('Antifer ponton pétrolier', 'Cabourg',
+                              'Men er Roue', 'Ouest Loscolo',
+                              'Le Cornard',
+                              'Arcachon - Bouée 7'))
+
+## Plotting the heatmap, maxima and GAM peaks
+# 4 versions of the plot : temperature/chl a/stratification/ssr heatmaps
+ggplot(Maxima_Dino_2_stats_select) +
+  geom_tile(data = Table_stratif_daily_RF, # Table_hydro_daily_RF
+            aes(x = Day, y = Code_point_Libelle, fill = SI_date.med), 
+            # fill = TEMP.med ; fill = CHLOROA.med ; fill = ssr.med
+            alpha = .8) +
+  # color palette for fill
+  # Stratification version
+  scale_fill_cmocean(name = 'deep', direction = 1) +
+  # Temperature version
+  # scale_fill_distiller(palette = 'RdBu', direction = -1) +
+  # Chl a version
+  # scale_fill_cmocean(name = 'algae') +
+  
+  # Add labels here so the name of the 'fill' legend is correct
+  # Labels (for TEMP plot fill = 'Median SST (°C)',
+  # Chl a: fill = 'Median [chl a] (mg/m3)',
+  # Stratif: fill = 'Median Stratification Index (-)')
+  labs(x = 'Day of the year', y = NULL, fill = 'Median Stratification Index (-)',
+       title = NULL) +
+  
+  # New fill scale for points
+  new_scale_fill() +
+  
+  # All maxima as smaller translucid points
+  geom_point(data = Maxima_Dino_RF, aes(x = Day, y = Code_point_Libelle, 
+                                            color = Code_point_Libelle), 
+             size = 2.5, alpha = .5) +
+  # Color scales (Maxima)
+  scale_color_discrete(type = pheno_palette10, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette10, guide = 'none') +
+  # New color scale
+  new_scale_fill() +
+  
+  # points for GAM peak
+  geom_point(data = GAM_peak_plot_RF, aes(y = Code_point_Libelle, x = Daymax, 
+                 fill = Code_point_Libelle), size = 4, color = 'grey10',
+             shape = 21, stroke = .5) +
+  # Color scales (GAM peak)
+  scale_fill_discrete(type = pheno_palette6, guide = 'none') +
+  
+  
+  # Axis stuff
+  # reverse y axis to get sites in the desired order
+  scale_y_discrete(limits = rev) +
+  scale_x_continuous(limits = c(1,365), breaks = c(1, 100, 200, 300, 365)) +
+  
+  # Theme
+  theme(plot.title = element_text(size = 11), 
+        # Axis
+        axis.title.x = element_text(size=10), 
+        axis.title.y =element_text(size=10), 
+        axis.text = element_text(size=8, color = 'black'),
+        axis.line.x = element_line(linewidth = .2, color = 'black'),
+        axis.line.y = element_line(linewidth = .2, color = 'black'),
+        # Legend
+        legend.background = element_rect(linewidth = .5, color = 'grey10'),
+        legend.title = element_text(size = 10, color = 'grey5'),
+        legend.frame = element_rect(linewidth = .5, color = 'grey10'),
+        legend.ticks = element_line(linewidth = .2, color = 'grey25'),
+        legend.position = 'bottom',
+        # Panel
+        panel.grid = element_blank(),
+        panel.background = element_blank(),
+        # Facet labels
+        strip.background = element_rect(fill = 'transparent',
+                                        linewidth = 1,
+                                        color = 'grey10'),
+        strip.text = element_text(color = 'grey5', size = 7.5))
+
+# Great! Let's save that
+# ggsave('Plots/REPHY/Dino_gam_max_stratif_RF.tiff', dpi = 300, height = 180, width = 100,
 #        units = 'mm', compression = 'lzw')
 
 ### Plotting maxima by latitude ####
