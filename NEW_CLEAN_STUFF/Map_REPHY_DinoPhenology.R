@@ -62,9 +62,14 @@ Table_sites_Bio <- Table_sites %>%
 Worldmap <- map_data('worldHires')
 
 ## River data
+# Smaller version
 sf_rivers <- read_sf('Data/Geography/shapefile_rivers/Riviere_inf_4.shp') %>%
   mutate(Width = ifelse(ORD_FLOW == 3, 1, .75))
 sf_rivers <- st_cast(sf_rivers, "MULTILINESTRING")
+
+# Bigger version
+sf_rivers_eu <- read_sf('Data/Geography/shapefile_rivers/HydroRIVERS_v10_eu.shp') %>%
+  filter(ORD_FLOW <= 5)
 
 #### Make the map ####
 
@@ -81,17 +86,21 @@ pheno_palette12 <- c('sienna4', 'tan3', 'red3', 'orangered',
 pheno_palette4 <- c('red3', 'orangered', 
                      '#2156A1', '#5995E3')
 
-# plotting the map
+# plotting the map (takes a long time with the big shapefile version)
 ggplot() + geom_polygon(data = Worldmap, aes(x = long, y = lat, group = group), 
                         fill = "white", color = 'gray10', size = .25)+
   labs(y = 'Latitude (degrees)', x = 'Longitude (degrees)',
        title = NULL)+
   
   # Rivers
-  geom_sf(data = sf_rivers, color = 'dodgerblue4',
-          linewidth = .4) +
-  # Color scale for rivers
-  scale_color_discrete(type = palette_rivers) +
+  geom_sf(data = sf_rivers_eu, aes(linewidth = factor(ORD_FLOW), 
+                                   alpha = factor(ORD_FLOW)),
+          color = 'dodgerblue4') +
+  # Alpha and linewidth scales
+  scale_alpha_manual(values = c("3" = 1, "4" = .8, "5" = .3), 
+                     guide = 'none') + #, "6" = .3, "7" = .2
+  scale_linewidth_manual(values = c("3" = .4, "4" = .3, "5" = .2), 
+                         guide = 'none') + # , "6" = .1
   # Bound coordinates
   coord_sf(
     crs = NULL,
@@ -99,92 +108,96 @@ ggplot() + geom_polygon(data = Worldmap, aes(x = long, y = lat, group = group),
     ylim = c(41,51.5)
   ) +
   
+  # points for sampling sites
   geom_point(data = Table_sites, aes(x = Longitude.mean, y = Latitude.mean, 
                               fill = Code_point_Libelle), size =4.5,
              shape = 21, alpha = .75, stroke = .1, color = 'gray10')+
-  
-  
-  
-  # Pas de Calais
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "Point 1 Boulogne"),
-            aes(x = Longitude.mean + 1.7, y = Latitude.mean,label = "Point 1 Boulogne" ), stat = 'unique',
-            size = 2,color="black",fontface = "bold") +
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "At so"),
-            aes(x = Longitude.mean + .7, y = Latitude.mean,label = "At so" ), stat = 'unique',
-            size = 2,color="black",fontface = "bold") +
-  # Baie de Seine
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "Antifer ponton pétrolier"),
-            aes(x = Longitude.mean + 2, y = Latitude.mean,label = "Antifer ponton pétrolier" ), stat = 'unique',
-            size = 2,color="black",fontface = "bold") +
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "Cabourg"),
-            aes(x = Longitude.mean + 1, y = Latitude.mean,label = "Cabourg" ), stat = 'unique', 
-            size = 2,color="black",fontface = "bold") +
-  # Bretagne Nord
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "les Hébihens"),
-            aes(x = Longitude.mean + 1.5, y = Latitude.mean,label = "les Hébihens" ), stat = 'unique',
-            size = 2,color="black",fontface = "bold") +
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "Loguivy"),
-            aes(x = Longitude.mean - .9, y = Latitude.mean +0.2,label = "Loguivy" ),
-            stat = 'unique', size = 2,color="black",fontface = "bold") +
-  # Bretagne Sud
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "Men er Roue"),
-            aes(x = Longitude.mean - 1.3, y = Latitude.mean,label = "Men er Roue" ), stat = 'unique',
-            size = 2,color="black",fontface = "bold") +
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "Ouest Loscolo"),
-            aes(x = Longitude.mean + 1.3, y = Latitude.mean,label = "Ouest Loscolo" ), stat = 'unique',
-            size = 2,color="black",fontface = "bold") +
-  # Pertuis
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "Le Cornard"),
-            aes(x = Longitude.mean + 1.1, y = Latitude.mean,label = "Le Cornard" ), stat = 'unique',
-            size = 2,color="black",fontface = "bold") +
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "Auger"),
-            aes(x = Longitude.mean + .8, y = Latitude.mean,label = "Auger" ), stat = 'unique',
-            size = 2,color="black",fontface = "bold") +
-  # Arcachon
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "Teychan bis"),
-            aes(x = Longitude.mean + 1.17, y = Latitude.mean,label = "Teychan bis" ), stat = 'unique',
-            size = 2,color="black",fontface = "bold") +
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "Arcachon - Bouée 7"),
-            aes(x = Longitude.mean + 2, y = Latitude.mean,label = "Arcachon - Bouée 7" ),
-            stat = 'unique', size = 2,color="black",fontface = "bold") +
-  # Méditerranée
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "Parc Leucate 2")[1,],
-            aes(x = Longitude.mean - 1.5, y = Latitude.mean -0.11,label = "Parc Leucate 2" ), stat = 'unique',
-            size = 2,color="black",fontface = "bold") +
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "Sète mer"),
-            aes(x = Longitude.mean - 1.1, y = Latitude.mean -0.05,label = "Sète mer" ), stat = 'unique',
-            size = 2,color="black",fontface = "bold") +
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "Bouzigues (a)")[1,],
-            aes(x = Longitude.mean - 1.5, y = Latitude.mean +0.15,label = "Bouzigues (a)" ), stat = 'unique',
-            size = 2,color="black",fontface = "bold") +
-  geom_text(data = filter(Table_sites,Code_point_Libelle == "Diana centre")[1,],
-            aes(x = Longitude.mean - 1.4, y = Latitude.mean,label = "Diana centre" ), stat = 'unique',
-            size = 2,color="black",fontface = "bold") +
-  
-  # geom_text(aes(x = 2.75, y = 48,label = "FRANCE" ), stat = 'unique', 
-  #           size = 7,color="burlywood4",fontface = "bold") +
-  
-  geom_text(aes(x = -3.5, y = 46, label = 'Atlantic Ocean'), stat = 'unique', 
-            size = 3,color = "lightblue4",fontface="italic",angle=-45) +
-  geom_text(aes(x = -3.2, y = 50, label = 'English Channel'), stat = 'unique', 
-            size = 3,color = "lightblue4",fontface="italic",angle=28) +
-  geom_text(aes(x = 5, y = 42, label = 'Mediterranean Sea'), stat = 'unique', 
-            size = 3,color = "lightblue4",fontface="italic",angle=8) +
-  
+  # fill scale
   scale_fill_discrete(type = pheno_palette16, guide = 'none') +
-  theme(panel.grid.major = element_line(color = 'gray10', size = .25),
+  
+  
+  
+  # # Pas de Calais
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "Point 1 Boulogne"),
+  #           aes(x = Longitude.mean + 1.7, y = Latitude.mean,label = "Point 1 Boulogne" ), stat = 'unique',
+  #           size = 2,color="black",fontface = "bold") +
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "At so"),
+  #           aes(x = Longitude.mean + .7, y = Latitude.mean,label = "At so" ), stat = 'unique',
+  #           size = 2,color="black",fontface = "bold") +
+  # # Baie de Seine
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "Antifer ponton pétrolier"),
+  #           aes(x = Longitude.mean + 2, y = Latitude.mean,label = "Antifer ponton pétrolier" ), stat = 'unique',
+  #           size = 2,color="black",fontface = "bold") +
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "Cabourg"),
+  #           aes(x = Longitude.mean + 1, y = Latitude.mean,label = "Cabourg" ), stat = 'unique', 
+  #           size = 2,color="black",fontface = "bold") +
+  # # Bretagne Nord
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "les Hébihens"),
+  #           aes(x = Longitude.mean + 1.5, y = Latitude.mean,label = "les Hébihens" ), stat = 'unique',
+  #           size = 2,color="black",fontface = "bold") +
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "Loguivy"),
+  #           aes(x = Longitude.mean - .9, y = Latitude.mean +0.2,label = "Loguivy" ),
+  #           stat = 'unique', size = 2,color="black",fontface = "bold") +
+  # # Bretagne Sud
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "Men er Roue"),
+  #           aes(x = Longitude.mean - 1.3, y = Latitude.mean,label = "Men er Roue" ), stat = 'unique',
+  #           size = 2,color="black",fontface = "bold") +
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "Ouest Loscolo"),
+  #           aes(x = Longitude.mean + 1.3, y = Latitude.mean,label = "Ouest Loscolo" ), stat = 'unique',
+  #           size = 2,color="black",fontface = "bold") +
+  # # Pertuis
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "Le Cornard"),
+  #           aes(x = Longitude.mean + 1.1, y = Latitude.mean,label = "Le Cornard" ), stat = 'unique',
+  #           size = 2,color="black",fontface = "bold") +
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "Auger"),
+  #           aes(x = Longitude.mean + .8, y = Latitude.mean,label = "Auger" ), stat = 'unique',
+  #           size = 2,color="black",fontface = "bold") +
+  # # Arcachon
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "Teychan bis"),
+  #           aes(x = Longitude.mean + 1.17, y = Latitude.mean,label = "Teychan bis" ), stat = 'unique',
+  #           size = 2,color="black",fontface = "bold") +
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "Arcachon - Bouée 7"),
+  #           aes(x = Longitude.mean + 2, y = Latitude.mean,label = "Arcachon - Bouée 7" ),
+  #           stat = 'unique', size = 2,color="black",fontface = "bold") +
+  # # Méditerranée
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "Parc Leucate 2")[1,],
+  #           aes(x = Longitude.mean - 1.5, y = Latitude.mean -0.11,label = "Parc Leucate 2" ), stat = 'unique',
+  #           size = 2,color="black",fontface = "bold") +
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "Sète mer"),
+  #           aes(x = Longitude.mean - 1.1, y = Latitude.mean -0.05,label = "Sète mer" ), stat = 'unique',
+  #           size = 2,color="black",fontface = "bold") +
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "Bouzigues (a)")[1,],
+  #           aes(x = Longitude.mean - 1.5, y = Latitude.mean +0.15,label = "Bouzigues (a)" ), stat = 'unique',
+  #           size = 2,color="black",fontface = "bold") +
+  # geom_text(data = filter(Table_sites,Code_point_Libelle == "Diana centre")[1,],
+  #           aes(x = Longitude.mean - 1.4, y = Latitude.mean,label = "Diana centre" ), stat = 'unique',
+  #           size = 2,color="black",fontface = "bold") +
+  # 
+  # # geom_text(aes(x = 2.75, y = 48,label = "FRANCE" ), stat = 'unique', 
+  # #           size = 7,color="burlywood4",fontface = "bold") +
+  # 
+  # geom_text(aes(x = -3.5, y = 46, label = 'Atlantic Ocean'), stat = 'unique', 
+  #           size = 3,color = "lightblue4",fontface="italic",angle=-45) +
+  # geom_text(aes(x = -3.2, y = 50, label = 'English Channel'), stat = 'unique', 
+  #           size = 3,color = "lightblue4",fontface="italic",angle=28) +
+  # geom_text(aes(x = 5, y = 42, label = 'Mediterranean Sea'), stat = 'unique', 
+  #           size = 3,color = "lightblue4",fontface="italic",angle=8) +
+  
+# Theme
+  theme(panel.grid.major = element_line(color = 'gray35', size = .2),
         panel.background = element_rect(fill = '#BBD4F2'),panel.border = element_blank(),
         legend.background = element_rect(fill = "white"),legend.key = element_rect(fill = "white"),
         legend.text = element_text(size=8,color = "black"),
         legend.title = element_text(size = 8, color = "black",face="bold"),
         plot.background = element_rect(color = "white", linewidth = 0.001),
         legend.position = "bottom",plot.title = element_text(size=10,color ="black"),
-        axis.text = element_text(size=10),axis.title.x = element_text(size=11),
-        axis.title.y = element_text(size=11))
+        axis.text = element_text(size=8),axis.title.x = element_text(size=9),
+        axis.title.y = element_text(size=9))
 
 # Save the map
-# ggsave('Plots/REPHY/MAP_DinoPhenology_rivers.tiff', dpi = 300, width = 100, height = 100,
-# units = 'mm', compression = 'lzw')
+ggsave('Plots/REPHY/MAP_DinoPhenology_rivers_blank_v2.tiff', dpi = 300,
+width = 80, height = 80,
+units = 'mm', compression = 'lzw')
 
 # plotting the map (without Mediterranean sites)
 ggplot() + geom_polygon(data = Worldmap, aes(x = long, y = lat, group = group), 
@@ -257,7 +270,7 @@ ggplot() + geom_polygon(data = Worldmap, aes(x = long, y = lat, group = group),
         legend.title = element_text(size = 8, color = "black",face="bold"),
         plot.background = element_rect(color = "white", linewidth = 0.001),
         legend.position = "bottom",plot.title = element_text(size=10,color ="black"),
-        axis.text = element_text(size=8),axis.title.x = element_text(size=8),
+        axis.text = element_text(size=7),axis.title.x = element_text(size=8),
         axis.title.y = element_text(size=8))
 
 # Save the map
