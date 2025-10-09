@@ -1,6 +1,6 @@
 #### Temperature and salinity heatmaps for Dinophysis phenology ##
 ## V. POCHIC
-# 2025/10/03
+# 2025/10/09
 # --> Now with only the sites selected for phenology analysis
 # (The Channel-Atlantic coast) and with Chl a (curated values - no hplc)
 
@@ -144,6 +144,14 @@ Table_stratif <- left_join(Stratif_14d, Stratif_dates,
 # Save the stratification dataset
 # write.csv2(Table_stratif, 'Data/Models/GAMAR/Outputs/Stratif_index_GAMAR_12sites.csv',
 # row.names = FALSE, fileEncoding = 'ISO-8859-1')
+
+### Importing atmospheric model data ####
+
+# Median values by fortnight
+Table_era5_ssr_daily_mean <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_ssr_daily_mean.csv', 
+                                         header = TRUE, fileEncoding = 'ISO-8859-1')
+
+
 
 ##### Plotting temperatures #####
 
@@ -464,6 +472,36 @@ ggplot(Table_stratif_select, aes(x = Fortnight,
   geom_point()  +
   scale_color_discrete(type = pheno_palette12) +
   facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y')
+
+##### Plotting Surface Solar Radiation ####
+
+### Now let's plot !
+
+# First, reorder the factor so that sampling sites appear in the desired order
+Table_era5_ssr_daily_mean <- Table_era5_daily_mean %>%
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis'))
+
+# Plot aesthetics
+pheno_palette12 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646')
+
+# Little plot on stratif (dates)
+ggplot(Table_era5_ssr_daily_mean, aes(x = Day, y = ssr, 
+                                 color = Code_point_Libelle)) +
+  geom_point()  +
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  facet_wrap(facets = c('Code_point_Libelle')) +
+  theme_classic()
+
+# Everything's fine
 
 ### Summarising by month ####
 

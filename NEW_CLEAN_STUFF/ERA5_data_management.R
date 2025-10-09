@@ -1,6 +1,6 @@
 ### ERA5 data: managing datasets ###
 
-# V. POCHIC, 2025/03/17
+# V. POCHIC, 2025/10/09
 
 # A script for managing ERA 5 datasets and getting them into the right format
 # for further integration in our analyses.
@@ -24,7 +24,7 @@ library(tidyverse)
 # Import data ####
 # Define the path to get the data files
 
-path<-c('ERA5/Extraction_rephy_era')
+path<-c('Data/Models/ERA5/Extraction_rephy_era')
 
 # List all files in the folders
 file_names <- path %>%
@@ -55,6 +55,7 @@ dataset <- lapply(file_names,function(i){read.csv2(i,
 # First, transform the date in a lubridate date format
 dataset <- dataset %>%
   mutate(Date = ymd_hms(time)) %>%
+  mutate(Hour = hour(Date)) %>%
   mutate(Day = yday(Date)) %>%
   mutate(Year = year(Date)) %>%
   mutate(Week = week(Date)) %>%
@@ -90,9 +91,17 @@ dataset <- dataset %>%
                    'Arcachon - Bouée 7', 'Teychan bis'))))))))))))
 
 # It's quite ugly, but it seems to work
-  
+
+# Modify the dataset for ssr to exclude night time (ssr=0)
+dataset_ssr <- select(dataset, -c('tcc','u10','v10')) %>%
+  filter(ssr > 0)
+
+# And exclude ssr from the other dataset
+dataset <- select(dataset, -c('ssr'))
 
 ## Aggregating data (daily, fortnightly...) ####
+
+# u10, v10, tcc ####
 
 # Currently the data is in hourly format. This is a bit too detailed for us.
 # We will aggregate the data over longer periods (day, week, fortnight...)
@@ -106,7 +115,7 @@ dataset_daily_mean <- dataset %>%
  # Ditch other variables
  select(-c(time, Date, Week, Fortnight)) %>%
  # Take the mean of other variables
- summarise(across(c(latitude, longitude, ssr, tcc, u10, v10), 
+ summarise(across(c(latitude, longitude, tcc, u10, v10), 
                   ~ mean(.)))
 
 # Median
@@ -116,7 +125,7 @@ dataset_daily_median <- dataset %>%
   # Ditch other variables
   select(-c(time, Date, Week, Fortnight)) %>%
   # Take the mean of other variables
-  summarise(across(c(latitude, longitude, ssr, tcc, u10, v10), 
+  summarise(across(c(latitude, longitude, tcc, u10, v10), 
                    ~ median(.)))
 
 
@@ -129,7 +138,7 @@ dataset_weekly_mean <- dataset %>%
   # Ditch other variables
   select(-c(time, Date, Day, Fortnight)) %>%
   # Take the mean of other variables
-  summarise(across(c(latitude, longitude, ssr, tcc, u10, v10), 
+  summarise(across(c(latitude, longitude, tcc, u10, v10), 
                    ~ mean(.)))
 
 # Median
@@ -139,7 +148,7 @@ dataset_weekly_median <- dataset %>%
   # Ditch other variables
   select(-c(time, Date, Day, Fortnight)) %>%
   # Take the mean of other variables
-  summarise(across(c(latitude, longitude, ssr, tcc, u10, v10), 
+  summarise(across(c(latitude, longitude, tcc, u10, v10), 
                    ~ median(.)))
 
 
@@ -151,7 +160,7 @@ dataset_fortnight_mean <- dataset %>%
   # Ditch other variables
   select(-c(time, Date, Week, Day)) %>%
   # Take the mean of other variables
-  summarise(across(c(latitude, longitude, ssr, tcc, u10, v10), 
+  summarise(across(c(latitude, longitude, tcc, u10, v10), 
                    ~ mean(.)))
 
 # Median
@@ -161,7 +170,80 @@ dataset_fortnight_median <- dataset %>%
   # Ditch other variables
   select(-c(time, Date, Week, Day)) %>%
   # Take the mean of other variables
-  summarise(across(c(latitude, longitude, ssr, tcc, u10, v10), 
+  summarise(across(c(latitude, longitude, tcc, u10, v10), 
+                   ~ median(.)))
+
+
+# ssr ####
+
+# Currently the data is in hourly format. This is a bit too detailed for us.
+# We will aggregate the data over longer periods (day, week, fortnight...)
+
+## Day
+# Mean
+# Compute the mean of variables over daily periods
+dataset_ssr_daily_mean <- dataset_ssr %>%
+  # Group by day, year and sampling site
+  group_by(Day, Year, Code_point_Libelle) %>%
+  # Ditch other variables
+  select(-c(time, Date, Week, Fortnight)) %>%
+  # Take the mean of other variables
+  summarise(across(c(latitude, longitude, ssr), 
+                   ~ mean(.)))
+
+# Median
+dataset_ssr_daily_median <- dataset_ssr %>%
+  # Group by day, year and sampling site
+  group_by(Day, Year, Code_point_Libelle) %>%
+  # Ditch other variables
+  select(-c(time, Date, Week, Fortnight)) %>%
+  # Take the mean of other variables
+  summarise(across(c(latitude, longitude, ssr), 
+                   ~ median(.)))
+
+
+## Week
+# Mean
+# Compute the mean of variables over daily periods
+dataset_ssr_weekly_mean <- dataset_ssr %>%
+  # Group by day, year and sampling site
+  group_by(Week, Year, Code_point_Libelle) %>%
+  # Ditch other variables
+  select(-c(time, Date, Day, Fortnight)) %>%
+  # Take the mean of other variables
+  summarise(across(c(latitude, longitude, ssr), 
+                   ~ mean(.)))
+
+# Median
+dataset_ssr_weekly_median <- dataset_ssr %>%
+  # Group by day, year and sampling site
+  group_by(Week, Year, Code_point_Libelle) %>%
+  # Ditch other variables
+  select(-c(time, Date, Day, Fortnight)) %>%
+  # Take the mean of other variables
+  summarise(across(c(latitude, longitude, ssr), 
+                   ~ median(.)))
+
+
+## Fortnight
+# Mean
+dataset_ssr_fortnight_mean <- dataset_ssr %>%
+  # Group by day, year and sampling site
+  group_by(Fortnight, Year, Code_point_Libelle) %>%
+  # Ditch other variables
+  select(-c(time, Date, Week, Day)) %>%
+  # Take the mean of other variables
+  summarise(across(c(latitude, longitude, ssr), 
+                   ~ mean(.)))
+
+# Median
+dataset_ssr_fortnight_median <- dataset_ssr %>%
+  # Group by day, year and sampling site
+  group_by(Fortnight, Year, Code_point_Libelle) %>%
+  # Ditch other variables
+  select(-c(time, Date, Week, Day)) %>%
+  # Take the mean of other variables
+  summarise(across(c(latitude, longitude, ssr), 
                    ~ median(.)))
 
 
@@ -195,15 +277,48 @@ dataset_daily_mean_plot <- dataset_daily_mean %>%
                                           'Le Cornard', 'Auger',
                                           'Arcachon - Bouée 7', 'Teychan bis'))
 
+# Same for ssr dataset
+dataset_ssr_daily_mean_plot <- dataset_ssr_daily_mean %>%
+  # Adding back the date variable
+  # To do this, we will exploit the fact that adding a number to an object of type
+  # 'Date' just adds the appropriate number of days.
+  # Create a month and day character variable, that is always '01-01'
+  mutate(MonthDay = '01-01') %>%
+  # Then unite it with Year to create something that will resemble a ymd date
+  mutate(CharYear = as.character(Year)) %>%
+  unite(Date, CharYear, MonthDay, sep = '-') %>%
+  # And make it a 'Date' object
+  mutate(Date = ymd(Date)) %>%
+  # Now, add Day-1 to each
+  mutate(Date = Date + (as.numeric(Day)-1)) %>%
+  # Code_point_Libelle as factor
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard', 'Auger',
+                                          'Arcachon - Bouée 7', 'Teychan bis'))
+
 # Color palette
 pheno_palette12 <- c('sienna4', 'tan3', 'red3', 'orangered', 
                      '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
                      '#1F3700', '#649003','#F7B41D', '#FBB646')
 
-# Here we plot the ssr, but we can look at any of the 4 variables (ssr, tcc, 
+# Here we plot the tcc, but we can look at any of the 4 variables (ssr, tcc, 
 # u10 or v10) with the same plot
 ggplot(dataset_daily_mean_plot, 
-       aes(x = Date, y = ssr, color = Code_point_Libelle)) +
+       aes(x = Date, y = tcc, color = Code_point_Libelle)) +
+  geom_point(size = .5, alpha = .8) +
+  # aesthetics
+  facet_wrap(facets = 'Code_point_Libelle') +
+  scale_color_discrete(type = pheno_palette12, guide = 'none') +
+  labs(y = 'Total Cloud Cover (tcc)') +
+  theme_classic()
+
+ggplot(dataset_ssr_daily_mean_plot, 
+       aes(x = Day, y = ssr, color = Code_point_Libelle)) +
   geom_point(size = .5, alpha = .8) +
   # aesthetics
   facet_wrap(facets = 'Code_point_Libelle') +
@@ -220,24 +335,49 @@ ggplot(dataset_daily_mean_plot,
 
 # ## Daily datasets
 # # Mean
-# write.csv2(dataset_daily_mean, file = 'ERA5/era5_dataset_daily_mean.csv',
+# write.csv2(dataset_daily_mean, file = 'Data/Models/ERA5/Outputs/era5_dataset_daily_mean.csv',
 #            row.names = FALSE, fileEncoding = 'ISO-8859-1')
 # # Median
-# write.csv2(dataset_daily_median, file = 'ERA5/era5_dataset_daily_median.csv',
+# write.csv2(dataset_daily_median, file = 'Data/Models/ERA5/Outputs/era5_dataset_daily_median.csv',
 #            row.names = FALSE, fileEncoding = 'ISO-8859-1')
-# 
+#
 # ## Weekly datasets
 # # Mean
-# write.csv2(dataset_weekly_mean, file = 'ERA5/era5_dataset_weekly_mean.csv',
+# write.csv2(dataset_weekly_mean, file = 'Data/Models/ERA5/Outputs/era5_dataset_weekly_mean.csv',
 #            row.names = FALSE, fileEncoding = 'ISO-8859-1')
 # # Median
-# write.csv2(dataset_weekly_median, file = 'ERA5/era5_dataset_weekly_median.csv',
+# write.csv2(dataset_weekly_median, file = 'Data/Models/ERA5/Outputs/era5_dataset_weekly_median.csv',
 #            row.names = FALSE, fileEncoding = 'ISO-8859-1')
-# 
+#
 # ## Fortnightly datasets
 # # Mean
-# write.csv2(dataset_fortnight_mean, file = 'ERA5/era5_dataset_fortnight_mean.csv',
+# write.csv2(dataset_fortnight_mean, file = 'Data/Models/ERA5/Outputs/era5_dataset_fortnight_mean.csv',
 #            row.names = FALSE, fileEncoding = 'ISO-8859-1')
 # # Median
-# write.csv2(dataset_fortnight_median, file = 'ERA5/era5_dataset_fortnight_median.csv',
+# write.csv2(dataset_fortnight_median, file = 'Data/Models/ERA5/Outputs/era5_dataset_fortnight_median.csv',
+#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
+
+# Same with the ssr datasets
+# ## Daily datasets
+# # Mean
+# write.csv2(dataset_ssr_daily_mean, file = 'Data/Models/ERA5/Outputs/era5_dataset_ssr_daily_mean.csv',
+#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
+# # Median
+# write.csv2(dataset_ssr_daily_median, file = 'Data/Models/ERA5/Outputs/era5_dataset_ssr_daily_median.csv',
+#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
+#
+# ## Weekly datasets
+# # Mean
+# write.csv2(dataset_ssr_weekly_mean, file = 'Data/Models/ERA5/Outputs/era5_dataset_ssr_weekly_mean.csv',
+#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
+# # Median
+# write.csv2(dataset_ssr_weekly_median, file = 'Data/Models/ERA5/Outputs/era5_dataset_ssr_weekly_median.csv',
+#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
+#
+# ## Fortnightly datasets
+# # Mean
+# write.csv2(dataset_ssr_fortnight_mean, file = 'Data/Models/ERA5/Outputs/era5_dataset_ssr_fortnight_mean.csv',
+#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
+# # Median
+# write.csv2(dataset_ssr_fortnight_median, file = 'Data/Models/ERA5/Outputs/era5_dataset_ssr_fortnight_median.csv',
 #            row.names = FALSE, fileEncoding = 'ISO-8859-1')

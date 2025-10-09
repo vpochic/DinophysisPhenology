@@ -674,6 +674,16 @@ Table_daily <- select(Table_hydro_daily, c('Day', 'Fortnight',
 Table_stratif_daily <- left_join(Table_daily, Table_stratif_fortnightly,
                                  by = c('Fortnight', 'Code_point_Libelle'))
 
+## And now, the ssr data from the ERA5 model (summarised by fortnight)
+Table_era5_ssr_fortnight_mean <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_ssr_fortnight_mean.csv', 
+                                       header = TRUE, fileEncoding = 'ISO-8859-1') %>%
+  group_by(Fortnight, Code_point_Libelle) %>%
+  summarise(across(c(latitude, longitude, ssr), 
+                   ~ mean(.)), .groups = 'keep')
+
+Table_ssr_daily <- left_join(Table_daily, Table_era5_ssr_fortnight_mean,
+                                 by = c('Fortnight', 'Code_point_Libelle'))
+
 # Excellent
 
 # Now, we plot! First, what we want to do is to have an idea of the distribution
@@ -692,6 +702,13 @@ Table_stratif_daily_select <- filter(Table_stratif_daily,
                                        'Men er Roue', 'Ouest Loscolo',
                                        'Le Cornard', 'Auger',
                                        'Arcachon - Bouée 7', 'Teychan bis'))
+
+Table_ssr_daily_select <- filter(Table_ssr_daily,
+                                     Code_point_Libelle %in%
+                                       c('Antifer ponton pétrolier', 'Cabourg',
+                                         'Men er Roue', 'Ouest Loscolo',
+                                         'Le Cornard', 'Auger',
+                                         'Arcachon - Bouée 7', 'Teychan bis'))
 
 Maxima_Dino_2_stats_select <- filter(Maxima_Dino_2_stats,
                                    Code_point_Libelle %in%
@@ -747,23 +764,26 @@ ggplot(Maxima_Dino_2_stats_select, aes(color = Code_point_Libelle)) +
 # Now we try to underlie a heatmap of temperature/chl a/stratification/ssr seasonality 
 # (4 versions of the plot)
 ggplot(Maxima_Dino_2_stats_select) +
-  geom_tile(data = Table_stratif_daily_select, # Table_hydro_daily_select
-            aes(x = Day, y = Code_point_Libelle, fill = SI_date.med), 
-            # fill = TEMP.med ; fill = CHLOROA.med ; fill = ssr.med
+  geom_tile(data = Table_ssr_daily_select, # Table_hydro_daily_select ; Table_stratif_daily_select
+            aes(x = Day, y = Code_point_Libelle, fill = ssr), 
+            # fill = TEMP.med ; fill = CHLOROA.med ; fill = SI_date.med
             alpha = .8) +
   # color palette for fill
   # Stratification version
-  scale_fill_cmocean(name = 'deep', direction = 1) +
+  # scale_fill_cmocean(name = 'deep', direction = 1) +
   # Temperature version
   # scale_fill_distiller(palette = 'RdBu', direction = -1) +
   # Chl a version
   # scale_fill_cmocean(name = 'algae') +
+  # ssr version
+  scale_fill_cmocean(name = 'solar') +
   
   # Add labels here so the name of the 'fill' legend is correct
   # Labels (for TEMP plot fill = 'Median SST (°C)',
   # Chl a: fill = 'Median [chl a] (mg/m3)',
-  # Stratif: fill = 'Median Stratification Index (-)')
-  labs(x = 'Day of the year', y = NULL, fill = 'Median Stratification Index (-)',
+  # Stratif: fill = 'Median Stratification Index (-)'
+  # ssr: fill = 'Mean Surface Solar Radiation (J/m2)'
+  labs(x = 'Day of the year', y = NULL, fill = fill = 'Mean Surface Solar Radiation (J/m2)',
        title = 'Maxima of Dinophysis counts (2007-2022)') +
   
   # New fill scale for points
@@ -841,12 +861,33 @@ GAM_peak_plot <- left_join(GAM_peak_plot, Maxima_Dino_2_stats_select,
 
 # And new version of the plot
 ggplot(GAM_peak_plot) +
+  geom_tile(data = Table_ssr_daily_select, # Table_hydro_daily_select ; Table_stratif_daily_select
+            aes(x = Day, y = Code_point_Libelle, fill = ssr), 
+            # fill = TEMP.med ; fill = CHLOROA.med ; fill = SI_date.med
+            alpha = .8) +
+  # color palette for fill
+  # Stratification version
+  # scale_fill_cmocean(name = 'deep', direction = 1) +
+  # Temperature version
+  # scale_fill_distiller(palette = 'RdBu', direction = -1) +
+  # Chl a version
+  # scale_fill_cmocean(name = 'algae') +
+  # ssr version
+  scale_fill_cmocean(name = 'solar') +
+  
+  # Add labels here so the name of the 'fill' legend is correct
+  # Labels (for TEMP plot fill = 'Median SST (°C)',
+  # Chl a: fill = 'Median [chl a] (mg/m3)',
+  # Stratif: fill = 'Median Stratification Index (-)'
+  # ssr: fill = 'Mean Surface Solar Radiation (J/m2)'
+  labs(x = 'Day of the year', y = NULL, fill = 'Mean Surface Solar Radiation (J/m2)') +
   geom_tile(data = Table_hydro_daily_select, 
-            aes(x = Day, y = Code_point_Libelle, fill = TEMP.med), #fill = CHLOROA.med
+            aes(x = Day, y = Code_point_Libelle, fill = ssr), #fill = TEMP.med, 
+            # fill = CHLOROA.med, fill = SALI.med, fill = ssr
             alpha = .8) +
   # color palette for fill
   # Temperature version
-  scale_fill_distiller(palette = 'RdBu', direction = -1) +
+  # scale_fill_distiller(palette = 'RdBu', direction = -1) +
   # Chl a version
   # scale_fill_cmocean(name = 'algae') +
   
@@ -1015,6 +1056,25 @@ Table_stratif_daily_RF <- filter(Table_stratif_daily,
                                           'Le Cornard',
                                           'Arcachon - Bouée 7'))
 
+# SSR
+Table_ssr_daily_RF <- filter(Table_ssr_daily,
+                                 Code_point_Libelle %in%
+                                   c('Point 1 Boulogne', 'At so',
+                                     'les Hébihens', 'Loguivy',
+                                     'Antifer ponton pétrolier', 'Cabourg',
+                                     'Men er Roue', 'Ouest Loscolo',
+                                     'Le Cornard',
+                                     'Arcachon - Bouée 7')) %>%
+  # Recode the Code_point_Libelle
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Point 1 Boulogne', 'At so',
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'les Hébihens', 'Loguivy',
+                                          'Men er Roue', 'Ouest Loscolo',
+                                          'Le Cornard',
+                                          'Arcachon - Bouée 7'))
+
 # Dinophysis maxima (REPHY data)
 Maxima_Dino_2_stats_RF <- filter(Maxima_Dino_2_stats,
                                      Code_point_Libelle %in%
@@ -1056,24 +1116,33 @@ GAM_peak_plot_RF <- filter(GAM_peak_plot, Code_point_Libelle %in%
                               'Arcachon - Bouée 7'))
 
 ## Plotting the heatmap, maxima and GAM peaks
-# 4 versions of the plot : temperature/chl a/stratification/ssr heatmaps
+# 5 versions of the plot : temperature/chl a/salinity/stratification/ssr heatmaps
 ggplot(Maxima_Dino_2_stats_select) +
-  geom_tile(data = Table_stratif_daily_RF, # Table_hydro_daily_RF
-            aes(x = Day, y = Code_point_Libelle, fill = SI_date.med), 
-            # fill = TEMP.med ; fill = CHLOROA.med ; fill = ssr.med
+  geom_tile(data = Table_hydro_daily_RF, # Table_hydro_daily_RF ; 
+            # Table_stratif_daily_RF ; Table_ssr_daily_RF
+            aes(x = Day, y = Code_point_Libelle, fill = SALI.med), 
+            # fill = TEMP.med ; fill = CHLOROA.med ; fill = SALI.med ; 
+            # fill = SI_date.med ; fill = ssr
             alpha = .8) +
   # color palette for fill
   # Stratification version
-  scale_fill_cmocean(name = 'deep', direction = 1) +
+  # scale_fill_cmocean(name = 'deep', direction = 1) +
   # Temperature version
   # scale_fill_distiller(palette = 'RdBu', direction = -1) +
   # Chl a version
   # scale_fill_cmocean(name = 'algae') +
+  # Salinity version
+  scale_fill_cmocean(name = 'haline') +
+  # ssr version
+  # scale_fill_cmocean(name = 'solar') +
   
   # Add labels here so the name of the 'fill' legend is correct
-  # Labels (for TEMP plot fill = 'Median SST (°C)',
+  # Labels for 
+  # SST: fill = 'Median SST (°C)',
   # Chl a: fill = 'Median [chl a] (mg/m3)',
-  # Stratif: fill = 'Median Stratification Index (-)')
+  # Salinity: fill = 'Median Salinity (PSU)',
+  # Stratif: fill = 'Median Stratification Index (-)',
+  # SSR: fill = 'Mean Surface Solar Radiation (J/m2)',
   labs(x = 'Day of the year', y = NULL, fill = 'Median Stratification Index (-)',
        title = NULL) +
   
@@ -1127,7 +1196,7 @@ ggplot(Maxima_Dino_2_stats_select) +
         strip.text = element_text(color = 'grey5', size = 7.5))
 
 # Great! Let's save that
-# ggsave('Plots/REPHY/Dino_gam_max_stratif_RF.tiff', dpi = 300, height = 180, width = 100,
+# ggsave('Plots/REPHY/Dino_gam_max_SALI_RF.tiff', dpi = 300, height = 180, width = 100,
 #        units = 'mm', compression = 'lzw')
 
 ### Plotting maxima by latitude ####
