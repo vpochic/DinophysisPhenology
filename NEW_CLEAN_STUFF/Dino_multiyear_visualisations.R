@@ -157,7 +157,7 @@ GAM_peak_select <- filter(GAM_peak, Code_point_Libelle %in%
 # Next step: split the maxima in 2 periods (before and after the pit)
 
 # True data
-Maxima_Dino_2 <- Season_Dino_nozeros %>%
+Maxima_Dino_bis <- Season_Dino_nozeros %>%
   # group
   group_by(Code_point_Libelle, Year) %>%
   # We'll need to create a period variable (1/2) for each site
@@ -217,11 +217,31 @@ Maxima_Dino_2 <- Season_Dino_nozeros %>%
                   ifelse(Code_point_Libelle == 'Diana centre',
                          2,
            # All other sites
-           1))))))))))))))))))))) %>%
+           1)))))))))))))))))))))
+
+# Now extract maxima
+Maxima_Dino_2 <- Maxima_Dino_bis %>%
   # Add period as a grouping variable
   group_by(Code_point_Libelle, Year, period) %>%
   # extract rows with yearly maxima of 'true_count' (slice() retains groups)
   slice(which.max(true_count)) %>%
+# Keep only Dinophysis cell densities >= X00 cells/L (more than X cells counted)
+filter(true_count >= 1)
+
+# Let's compute the number of observations of Dinophysis by period
+Maxima_Dino_n <- Maxima_Dino_bis %>%
+  # groups
+  group_by(Code_point_Libelle, Year, period) %>%
+  # summarise to get n
+  summarise(n_max = n(), max_Dino = max(true_count), .groups = 'keep') %>%
+  # Create a "shape" variable for plotting
+  mutate(shape = ifelse(period == 1 & n_max > 1 & max_Dino > 1, 1, 
+                        ifelse(period == 2 & n_max > 1 & max_Dino > 1, 2,
+                               ifelse(period == 1 & (n_max == 1 || max_Dino == 1), 3,
+                                      4))))
+
+# Join both datasets to get n() info on maxima
+Maxima_Dino_2 <- left_join(Maxima_Dino_2, Maxima_Dino_n) %>%
   # Code_point_Libelle as factor
   mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
   mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
@@ -232,9 +252,9 @@ Maxima_Dino_2 <- Season_Dino_nozeros %>%
                                           'Le Cornard', 'Auger',
                                           'Arcachon - Bouée 7', 'Teychan bis',
                                           'Parc Leucate 2', 'Bouzigues (a)',
-                                          'Sète mer', 'Diana centre')) %>%
-# Keep only Dinophysis cell densities >= X00 cells/L (more than X cells counted)
-filter(true_count >= 1)
+                                          'Sète mer', 'Diana centre'))
+
+# Seems perfect.
 
 # GAM fit
 GAM_peak_select2 <- GAM_peak_select %>%
@@ -377,14 +397,24 @@ ggplot(Maxima_Dino_2,
 #   # We'll go from 36 to 401 (in our new system)
 #   mutate(NewDay = ifelse(Day <= 35, Day + 365, Day))
 
+# Color palette for all sites
+pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646',
+                     '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
+
+
+
 # Same plot as before but with NewDay as x
-ggplot(Maxima_Dino_2, 
+ggplot(data  = Maxima_Dino_2, 
        aes(x = Year, y = Day, color = Code_point_Libelle, 
-           shape = as.factor(period))) +
+           shape = as.factor(shape))) +
   # First the points
   geom_point(size = 2.5, alpha = .8) +
-  # then add linear regression fit for some sites only
-  geom_smooth(data = subset(Maxima_Dino_2,
+  
+  # then add linear regression fit for some sites only and only with n_max > 1
+  # over the period
+  geom_smooth(data = subset(Maxima_Dino_2, max_Dino > 1 & n_max > 1 &
                             Code_point_Libelle %in% 
                               c('Antifer ponton pétrolier', 'Cabourg',
                                 'Men er Roue', 'Ouest Loscolo',
@@ -394,20 +424,22 @@ ggplot(Maxima_Dino_2,
                                 'Diana centre')),
               aes(x = Year, y = Day, color = Code_point_Libelle),
               method = 'lm', alpha = .25, linewidth = .5) +
+  
   # Special one for Parc Leucate
   geom_smooth(data = subset(Maxima_Dino_2,
                             Code_point_Libelle == 'Parc Leucate 2' &
                               period == 1),
               aes(x = Year, y = Day),color = '#642C3A',
               method = 'lm', alpha = .25, linewidth = .5) +
-  # new color scale for the points
-  scale_color_discrete(type = pheno_palette16, guide = 'none') +
   # aesthetics
   facet_wrap(facets = 'Code_point_Libelle', nrow = 4) +
   scale_y_continuous(limits = c(1, 365), 
                      breaks = c(1, 100, 200, 300, 365)) +
-  scale_shape_discrete(guide = 'none') +
-  # scale_shape_manual(values = c(1, 3), guide = 'none') +
+  
+  # Color scale for all
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  # Scale for shape
+  scale_shape_manual(values = c(16, 17, 1, 2), guide = 'none') +
   # labels
   labs(y = 'Day of maximum Dinophysis count (DOY)') +
   theme_classic()
@@ -723,6 +755,20 @@ Maxima_Dino_select <- filter(Maxima_Dino_2,
                                  'Le Cornard', 'Auger',
                                  'Arcachon - Bouée 7', 'Teychan bis'))
 
+# Summarise GAM data to remove the year
+GAM_peak_plot <- GAM_peak_select2 %>%
+  filter(Day < 300) %>%
+  group_by(Code_point_Libelle, period) %>%
+  summarise(Daymax = mean(Day), .groups = 'keep')
+
+GAM_peak_plot <- left_join(GAM_peak_plot, Maxima_Dino_2_stats_select,
+                           by = c('Code_point_Libelle', 'period')) %>%
+  filter(Code_point_Libelle %in%
+           c('Antifer ponton pétrolier', 'Cabourg',
+             'Men er Roue', 'Ouest Loscolo',
+             'Le Cornard', 'Auger',
+             'Arcachon - Bouée 7', 'Teychan bis'))
+
 ### Plots ------
 
 # New color scale
@@ -901,13 +947,13 @@ ggplot(GAM_peak_plot) +
   
   # All maxima as smaller translucid points
   geom_point(data = Maxima_Dino_select, aes(x = Day, y = Code_point_Libelle, 
-                                            color = Code_point_Libelle), 
+                                            color = Code_point_Libelle, shape = shape), 
              size = 2.5, alpha = .5) +
   
   # points for GAM peak
   geom_point(aes(y = Code_point_Libelle, x = Daymax, 
-                 fill = Code_point_Libelle), size = 4, color = 'grey10',
-             shape = 21, stroke = .5) +
+                 fill = Code_point_Libelle, shape = shape), 
+             size = 4, color = 'grey10', stroke = .5) +
   
   # Color scales
   scale_color_discrete(type = pheno_palette8, guide = 'none') +
@@ -1025,7 +1071,7 @@ Table_hydro_daily_RF <- filter(Table_hydro_daily,
                                        'les Hébihens', 'Loguivy',
                                        'Antifer ponton pétrolier', 'Cabourg',
                                        'Men er Roue', 'Ouest Loscolo',
-                                       'Le Cornard',
+                                       'Le Cornard', 'Auger',
                                        'Arcachon - Bouée 7')) %>%
   # Recode the Code_point_Libelle
   mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
@@ -1034,7 +1080,7 @@ Table_hydro_daily_RF <- filter(Table_hydro_daily,
                                           'Antifer ponton pétrolier', 'Cabourg',
                                           'les Hébihens', 'Loguivy',
                                           'Men er Roue', 'Ouest Loscolo',
-                                          'Le Cornard',
+                                          'Le Cornard', 'Auger',
                                           'Arcachon - Bouée 7'))
 
 # Stratification
@@ -1044,7 +1090,7 @@ Table_stratif_daily_RF <- filter(Table_stratif_daily,
                                    'les Hébihens', 'Loguivy',
                                    'Antifer ponton pétrolier', 'Cabourg',
                                    'Men er Roue', 'Ouest Loscolo',
-                                   'Le Cornard',
+                                   'Le Cornard', 'Auger',
                                    'Arcachon - Bouée 7')) %>%
   # Recode the Code_point_Libelle
   mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
@@ -1053,7 +1099,7 @@ Table_stratif_daily_RF <- filter(Table_stratif_daily,
                                           'Antifer ponton pétrolier', 'Cabourg',
                                           'les Hébihens', 'Loguivy',
                                           'Men er Roue', 'Ouest Loscolo',
-                                          'Le Cornard',
+                                          'Le Cornard', 'Auger',
                                           'Arcachon - Bouée 7'))
 
 # SSR
@@ -1063,7 +1109,7 @@ Table_ssr_daily_RF <- filter(Table_ssr_daily,
                                      'les Hébihens', 'Loguivy',
                                      'Antifer ponton pétrolier', 'Cabourg',
                                      'Men er Roue', 'Ouest Loscolo',
-                                     'Le Cornard',
+                                     'Le Cornard', 'Auger',
                                      'Arcachon - Bouée 7')) %>%
   # Recode the Code_point_Libelle
   mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
@@ -1072,25 +1118,27 @@ Table_ssr_daily_RF <- filter(Table_ssr_daily,
                                           'Antifer ponton pétrolier', 'Cabourg',
                                           'les Hébihens', 'Loguivy',
                                           'Men er Roue', 'Ouest Loscolo',
-                                          'Le Cornard',
+                                          'Le Cornard', 'Auger',
                                           'Arcachon - Bouée 7'))
 
 # Dinophysis maxima (REPHY data)
-Maxima_Dino_2_stats_RF <- filter(Maxima_Dino_2_stats,
-                                     Code_point_Libelle %in%
-                                       c('Point 1 Boulogne', 'At so',
-                                         'les Hébihens', 'Loguivy',
-                                         'Antifer ponton pétrolier', 'Cabourg',
-                                         'Men er Roue', 'Ouest Loscolo',
-                                         'Le Cornard',
-                                         'Arcachon - Bouée 7'))
+# Maxima_Dino_2_stats_RF <- filter(Maxima_Dino_2_stats,
+#                                      Code_point_Libelle %in%
+#                                        c('Point 1 Boulogne', 'At so',
+#                                          'les Hébihens', 'Loguivy',
+#                                          'Antifer ponton pétrolier', 'Cabourg',
+#                                          'Men er Roue', 'Ouest Loscolo',
+#                                          'Le Cornard', 'Auger',
+#                                          'Arcachon - Bouée 7'))
+
 Maxima_Dino_RF <- filter(Maxima_Dino_2,
                              Code_point_Libelle %in%
                                c('Point 1 Boulogne', 'At so',
                                  'les Hébihens', 'Loguivy',
                                  'Antifer ponton pétrolier', 'Cabourg',
                                  'Men er Roue', 'Ouest Loscolo',
-                                 'Le Cornard', 'Arcachon - Bouée 7')) %>%
+                                 'Le Cornard', 'Auger',
+                                 'Arcachon - Bouée 7')) %>%
   # Recode the Code_point_Libelle
   mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
   mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
@@ -1098,26 +1146,30 @@ Maxima_Dino_RF <- filter(Maxima_Dino_2,
                                           'Antifer ponton pétrolier', 'Cabourg',
                                           'les Hébihens', 'Loguivy',
                                           'Men er Roue', 'Ouest Loscolo',
-                                          'Le Cornard',
+                                          'Le Cornard', 'Auger',
                                           'Arcachon - Bouée 7'))
 
-# New color scales
-pheno_palette10 <- c('sienna4', 'tan3', 'red3', 'orangered', 
-                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
-                     '#1F3700', '#F7B41D')
-pheno_palette6 <- c('red3', 'orangered', '#2156A1', '#5995E3', 
-                     '#1F3700', '#F7B41D')
-
-# New GAM peak table (without 2 sites)
+# New GAM peak table (without 1 site: Teychan)
 GAM_peak_plot_RF <- filter(GAM_peak_plot, Code_point_Libelle %in% 
                             c('Antifer ponton pétrolier', 'Cabourg',
                               'Men er Roue', 'Ouest Loscolo',
-                              'Le Cornard',
-                              'Arcachon - Bouée 7'))
+                              'Le Cornard', 'Auger',
+                              'Arcachon - Bouée 7')) %>%
+  # shape variable
+  mutate(shape = ifelse(period == 1, 5, 6))
+
+
+# New color scales
+pheno_palette11 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003', '#F7B41D')
+
+pheno_palette7 <- c('red3', 'orangered', '#2156A1', '#5995E3', 
+                    '#1F3700', '#649003', '#F7B41D')
 
 ## Plotting the heatmap, maxima and GAM peaks
 # 5 versions of the plot : temperature/chl a/salinity/stratification/ssr heatmaps
-ggplot(Maxima_Dino_2_stats_select) +
+ggplot() +
   geom_tile(data = Table_hydro_daily_RF, # Table_hydro_daily_RF ; 
             # Table_stratif_daily_RF ; Table_ssr_daily_RF
             aes(x = Day, y = Code_point_Libelle, fill = SALI.med), 
@@ -1151,20 +1203,24 @@ ggplot(Maxima_Dino_2_stats_select) +
   
   # All maxima as smaller translucid points
   geom_point(data = Maxima_Dino_RF, aes(x = Day, y = Code_point_Libelle, 
-                                            color = Code_point_Libelle), 
-             size = 2.5, alpha = .5) +
+                                            color = Code_point_Libelle,
+                                        shape = as_factor(shape)), 
+             size = 2.5, alpha = .8) +
   # Color scales (Maxima)
-  scale_color_discrete(type = pheno_palette10, guide = 'none') +
-  scale_fill_discrete(type = pheno_palette10, guide = 'none') +
+  scale_color_discrete(type = pheno_palette11, guide = 'none') +
+  # scale_fill_discrete(type = pheno_palette10, guide = 'none') +
   # New color scale
-  new_scale_fill() +
+  # new_scale_fill() +
   
   # points for GAM peak
   geom_point(data = GAM_peak_plot_RF, aes(y = Code_point_Libelle, x = Daymax, 
-                 fill = Code_point_Libelle), size = 4, color = 'grey10',
-             shape = 21, stroke = .5) +
+                 fill = Code_point_Libelle, shape = as_factor(shape)), 
+             size = 4, color = 'grey10',stroke = .5) +
   # Color scales (GAM peak)
-  scale_fill_discrete(type = pheno_palette6, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette7, guide = 'none') +
+  
+  # Scale for shape (all points) +
+  scale_shape_manual(values = c(16, 17, 1, 2, 21, 24), guide = 'none') +
   
   
   # Axis stuff
