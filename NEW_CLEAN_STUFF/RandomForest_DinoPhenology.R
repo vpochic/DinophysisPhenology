@@ -1,6 +1,6 @@
 ###### Random forest model for Dinophysis phenology ###
 ## V. POCHIC
-# 2025-06-26
+# 2025-10-14
 
 # The goal here is to apply a random forest model to our data on Dinophysis
 # accumulation/loss rates, in order to identify the variables that are best
@@ -12,7 +12,7 @@
 # Careful! We need data files computed with the following scripts:
 # GAM_Dino_all_sites-mgcv.R (for the GAM models)
 # Deriv_GAMs_DinoPhenology_REPHY.R (for the derivatives = acc. rates)
-# Dino_phenology_heatmaps.R (for the environmental variables)
+# Dino_phenology_envdata.R (for the environmental variables)
 
 ### Packages ####
 library(tidymodels)
@@ -178,29 +178,14 @@ Table_stratif <- read.csv2('Data/Models/GAMAR/Outputs/Stratif_index_GAMAR_12site
 # These data are in 3 period formats (daily, weekly, fortnightly) and in 2 stats
 # format (median over the period or mean over the period)
 
-## Daily
+## Daily wind and tcc data
 # Mean
 Table_era5_daily_mean <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_daily_mean.csv', 
                                    header = TRUE, fileEncoding = 'ISO-8859-1')
-# Median
-Table_era5_daily_median <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_daily_mean.csv', 
-                                   header = TRUE, fileEncoding = 'ISO-8859-1')
 
-## Weekly
-# Mean
-Table_era5_weekly_mean <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_weekly_mean.csv', 
-                                   header = TRUE, fileEncoding = 'ISO-8859-1')
-# Median
-Table_era5_weekly_median <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_weekly_mean.csv', 
-                                     header = TRUE, fileEncoding = 'ISO-8859-1')
-
-## Fortnightly
-# Mean
-Table_era5_fortnight_mean <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_fortnight_mean.csv', 
-                                    header = TRUE, fileEncoding = 'ISO-8859-1')
-# Median
-Table_era5_fortnight_median <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_fortnight_mean.csv', 
-                                    header = TRUE, fileEncoding = 'ISO-8859-1')
+# Surface Solar Radiation
+Table_ssr_daily_mean <- read.csv2('Data/Models/ERA5/Outputs/era5_dataset_ssr_daily_mean.csv', 
+                                  header = TRUE, fileEncoding = 'ISO-8859-1')
 
 #### Joining datasets ####
 
@@ -220,11 +205,23 @@ Table_data_RF <- left_join(Table_data_RF, Table_hydro_select,
 
 # Fantastic
 
-## Third, the ERA5 data (only daily mean for now)
+## Third, the ERA5 data (tcc, u10, v10, only daily mean for now)
 # events are associated by day and year (and sampling site of course)
 Table_data_RF <- left_join(Table_data_RF, Table_era5_daily_mean, 
                            by = c('Year', 'Day', 'Code_point_Libelle'),
                            suffix = c('',''))
+
+## Last, the ERA5 ssr data
+# events are associated by day and year (and sampling site of course)
+Table_data_RF <- left_join(Table_data_RF, Table_ssr_daily_mean, 
+                           by = c('Year', 'Day', 'Code_point_Libelle'),
+                           suffix = c('',''))
+
+
+
+# Let's write this table to use it later in other scripts
+# write.csv2(Table_data_RF, 'Data/Models/Table_env_RF_daily.csv',
+#            fileEncoding = 'ISO-8859-1', row.names = FALSE)
 
 # Good.
 
@@ -263,15 +260,14 @@ ggplot(Table_data_RF_multiyear) +
 #### First random forest model: 10 sites with fewer parameters ####
 ### 1.1. Daily data ####
 # For this first step, we will consider data at the daily level
-# In a second step, we will integrate everything over a period of 2 weeks
+# In a second step, we may integrate everything over a period of 2 weeks
 
 ### Preparing model data ####
 
-# We will get rid of 2 sampling points because the stratification data of the
-# oceanic model is bad there (problems with shallow water column)
+# We will get rid of 1 sampling point (Teychan) because the stratification data of the
+# oceanic model is bad there (problems with shallow water column in this lagoon site)
 Table_data_RF_multiyear_select <- filter(Table_data_RF_multiyear,
-                                         (Code_point_Libelle != 'Auger' &
-                                          Code_point_Libelle != 'Teychan bis'))
+                                          Code_point_Libelle != 'Teychan bis')
 
 ### We will split the dataset to have a training and a validation set
 ## First, we will exclude 5 random years that will serve as our true validation 
@@ -445,7 +441,7 @@ geom_point(aes(x = .derivative, y = .pred), color = '#2156A1') +
 theme_classic()
 
 # Save this plot
-# ggsave('Plots/RF_models/Modelperf_RF10inst_valid.tiff',
+# ggsave('Plots/RF_models/Modelperf_RF10inst_valid_20251014.tiff',
 #        height = 140, width = 140, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
@@ -473,7 +469,7 @@ variable distribution', x = 'Count', y = 'Value of response variable') +
   theme_classic()
 
 # Save this plot
-# ggsave('Plots/RF_models/RMSE_vs_values_RF10inst.tiff',
+# ggsave('Plots/RF_models/RMSE_vs_values_RF10inst_20251014.tiff',
 #        height = 140, width = 140, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
@@ -594,13 +590,13 @@ for (i in 1:20) {
 }
 
 # Save the result!
-# write.csv2(dataplot_vip, 'Data/RF_outputs/Randomforest10_vip_data_20250626.csv',
-#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
+write.csv2(dataplot_vip, 'Data/RF_outputs/Randomforest10_vip_data_20251014.csv',
+           row.names = FALSE, fileEncoding = 'ISO-8859-1')
 
 ## Variable importance plot ####
 
 # If necessary, import data previously saved
-# dataplot_vip <- read.csv2('Data/RF_outputs/Randomforest10_vip_data_20250626.csv', header = TRUE,
+# dataplot_vip <- read.csv2('Data/RF_outputs/Randomforest10_vip_data_20251014.csv', header = TRUE,
 #                           fileEncoding = 'ISO-8859-1')
 
 # We pivot longer the values of variable importance to get tidy data
@@ -620,34 +616,32 @@ dataplot_vip_median <- dataplot_vip_tidy %>%
 dataplot_vip_tidy <- dataplot_vip_tidy %>%
   mutate(Variable = as_factor(Variable)) %>%
   # relevel the factor in descending order of variable importance
-  mutate(Variable = fct_relevel(Variable, 'ssr', 'TEMP', 'v10', 'SALI', 
-                                'Stratification_Index', 'CHLOROA', 'tcc', 'u10'))
+  mutate(Variable = fct_relevel(Variable, 'TEMP', 'ssr', 'v10', 'SALI', 
+                                'Stratification_Index', 'tcc', 'CHLOROA', 'u10'))
 
 # Color palette
 palette_bretagne8 <- c('#FBA823', 'red3', '#FBB665', '#11203E', '#377185',
                        '#B47E24', '#1F3700', '#FBB646')
 
 # Plot
-ggplot(data = dataplot_vip_tidy, aes(x = Variable, y = value, color = Variable)) +
+ggplot(data = dataplot_vip_tidy, aes(x = Variable, y = value)) +
   # A dot plot of medians
   geom_point(data = dataplot_vip_median,
-             aes(x = Variable, y = value.median, color = Variable),
-             size = 4.5) +
+             aes(x = Variable, y = value.median),
+             size = 4.5, shape = 21, color = 'black', fill = 'grey40') +
   # With a dot plot of all simulations as overlay
   geom_point(position = position_jitter(width = .1),
-             alpha = .4, size = 1.5) +
+             alpha = .4, size = 1.5, color = 'grey10') +
   # Custom label for y axis
   labs(x = NULL, y = 'Variable importance') +
   # Flip x and y axes
   coord_flip() +
   # Reverse x axis so most important variable appears at the top
   scale_x_discrete(limits = rev) +
-  # Color palette
-  scale_color_discrete(type = palette_bretagne8, guide = 'none') +
   theme_classic()
 
 # Save the plot
-# ggsave('VIP_RandomForest_10sites_20250415.tiff', width = 164, height = 130, units = 'mm',
+# ggsave('Plots/RF_models/VIP_RandomForest_10sites_20251014.tiff', width = 164, height = 130, units = 'mm',
 #        compression = 'lzw', dpi = 300)
 
 # According to Dr. Bede Davies, it's better to represent it as mean +-std error
@@ -667,14 +661,14 @@ dataplot_vip_stats <- left_join(dataplot_vip_mean, dataplot_vip_sd,
   # Nice. Now reorder the factor
   mutate(Variable = as_factor(Variable)) %>%
   # relevel the factor in descending order of variable importance
-  mutate(Variable = fct_relevel(Variable, 'ssr', 'TEMP', 'v10', 'SALI', 
+  mutate(Variable = fct_relevel(Variable, 'TEMP', 'ssr', 'v10', 'SALI', 
                                 'Stratification_Index', 'tcc', 'CHLOROA', 'u10'))
 
 # Same for the datset with the individual runs
 dataplot_vip_tidy <- dataplot_vip_tidy %>%
   mutate(Variable = as_factor(Variable)) %>%
   # relevel the factor in descending order of variable importance
-  mutate(Variable = fct_relevel(Variable, 'ssr', 'TEMP', 'v10', 'SALI', 
+  mutate(Variable = fct_relevel(Variable, 'TEMP', 'ssr', 'v10', 'SALI', 
                                 'Stratification_Index', 'tcc', 'CHLOROA', 'u10'))
 
 # Color palette
@@ -682,13 +676,11 @@ palette_bretagne8 <- c('#FBA823', 'red3', '#FBB665', '#11203E', '#377185',
                        '#B47E24', '#1F3700', '#FBB646')
 
 # Plot with mean +- sd
-ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean, 
-                                      fill = Variable)) +
+ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean)) +
   # all data points for 20 model runs
-  geom_point(data = dataplot_vip_tidy, aes(x = Variable, y = value, 
-                                           color = Variable),
+  geom_point(data = dataplot_vip_tidy, aes(x = Variable, y = value),
              position = position_jitter(width = .1),
-             alpha = .4, size = 1.5) +
+             alpha = .4, size = 1.5, color = 'grey10') +
   
   # error bars
   geom_errorbar(aes(x = Variable, ymin = value.mean - value.sd,
@@ -696,12 +688,9 @@ ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean,
                 color = 'grey10', width = .2) +
   
   # points for means
-  geom_point(size = 4, color = 'grey10',
+  geom_point(size = 4, color = 'black', fill = 'grey45',
              shape = 21, stroke = .5) +
   
-  # Color scales
-  scale_fill_discrete(type = palette_bretagne8, guide = 'none') +
-  scale_color_discrete(type = palette_bretagne8, guide = 'none') +
   # Custom label for y axis
   labs(x = NULL, y = 'Variable importance score') +
   # Flip x and y axes
@@ -711,7 +700,7 @@ ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean,
   theme_classic()
 
 # Save the plot
-# ggsave('Plots/RF_models/VIP_RandomForest10_meansd_20250626.tiff', width = 100,
+# ggsave('Plots/RF_models/VIP_RandomForest10_meansd_20251014.tiff', width = 100,
 # height = 120, units = 'mm', compression = 'lzw', dpi = 300)
 
 #### Second random forest model: 4 sites with more parameters ####
