@@ -1,6 +1,6 @@
 ### GAMs of pigment concentrations ###
 # Part of the Dinophysis Phenology project
-# V. POCHIC 2025-09-04
+# V. POCHIC 2025-10-18
 
 ### Required packages ####
 
@@ -1363,6 +1363,10 @@ plot_Meso_OL <- ggplot() +
               color = '#5995E3', fill = '#5995E3') +
   geom_line(data = gam_Meso_OL, aes(x = Day, y = median.fit*100),
             linewidth = .7, color = '#5995E3') +
+  # Satellite observations of Mesodinium blooms
+  geom_point(data = subset(Satellite_survey_Meso, Code_point_Libelle == 'Ouest Loscolo'),
+             aes(x = Day, y = true_count*300),
+             color = 'firebrick4', shape = 8, size = 3.5, stroke = .45) +
   # Text
   labs(subtitle = '',
        x = NULL, # subtitle = 'Mesodinium (cells counted)',
@@ -1434,6 +1438,10 @@ plot_Meso_Cabourg <- ggplot() +
               color = 'orangered', fill = 'orangered') +
   geom_line(data = gam_Meso_Cabourg, aes(x = Day, y = median.fit*100),
             linewidth = .7, color = 'orangered') +
+  # Satellite observations of Mesodinium blooms
+  geom_point(data = subset(Satellite_survey_Meso, Code_point_Libelle == 'Cabourg'),
+             aes(x = Day, y = true_count*300),
+             color = 'firebrick4', shape = 8, size = 3.5, stroke = .45) +
   # Text
   labs(subtitle = 'Mesodinium (cells per L)', x = NULL, 
        y = NULL) +
