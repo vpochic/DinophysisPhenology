@@ -1,6 +1,6 @@
 ###### Random forest model for Dinophysis phenology ###
 ## V. POCHIC
-# 2025-10-14
+# 2025-11-05
 
 # The goal here is to apply a random forest model to our data on Dinophysis
 # accumulation/loss rates, in order to identify the variables that are best
@@ -1001,7 +1001,7 @@ ggplot(MeR_prediction) +
   theme_classic()
 
 # Save this plot
-# ggsave('Plots/RF_models/Modelperf_RF4inst_valid.tiff',
+# ggsave('Plots/RF_models/Modelperf_RF4inst_valid_20251105.tiff',
 #        height = 140, width = 140, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
@@ -1029,14 +1029,14 @@ variable distribution', x = 'Value of response variable', y = 'Count') +
   theme_classic()
 
 # Save this plot
-# ggsave('Plots/RF_models/RMSE_vs_values_RF4inst.tiff',
+# ggsave('Plots/RF_models/RMSE_vs_values_RF4inst_20251105.tiff',
 #        height = 140, width = 140, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
 ### Investigating the most important features of the model ####
 
 # keep the same seed
-set.seed(555)
+set.seed(234)
 
 final_RF %>%
   set_engine('ranger', importance = 'permutation') %>%
@@ -1150,13 +1150,13 @@ for (i in 1:20) {
 }
 
 # Save the result!
-# write.csv2(dataplot_vip, 'Data/RF_outputs/Randomforest2_vip_data_20250626.csv',
+# write.csv2(dataplot_vip, 'Data/RF_outputs/Randomforest2_vip_data_20251105.csv',
 #            row.names = FALSE, fileEncoding = 'ISO-8859-1')
 
 ## Variable importance plot ####
 
 # If necessary, import data previously saved
-# dataplot_vip_import <- read.csv2('Randomforest_vip_data_20250318.csv', header = TRUE,
+# dataplot_vip_import <- read.csv2('Randomforest_vip_data_20251105.csv', header = TRUE,
 #                           fileEncoding = 'ISO-8859-1')
 
 # We pivot longer the values of variable importance to get tidy data
@@ -1189,9 +1189,9 @@ dataplot_vip_tidy <- dataplot_vip_tidy %>%
                                 'u10', 'v10'))
 
 # Color palette
-palette_bretagne16 <- c('#FC4D6B', 'red3', '#FF6448', '#8B064B', '#FBA823', '#DEB1CC', 
-                        '#11203E', '#377185', '#1F3700', '#2A56A1', '#9DA51E',
-                        '#B47E24', '#711412', '#FBB646', '#FBB665')
+# palette_bretagne16 <- c('#FC4D6B', 'red3', '#FF6448', '#8B064B', '#FBA823', '#DEB1CC', 
+#                         '#11203E', '#377185', '#1F3700', '#2A56A1', '#9DA51E',
+#                         '#B47E24', '#711412', '#FBB646', '#FBB665')
 
 # Plot
 ggplot(data = dataplot_vip_tidy, aes(x = Variable, y = value, color = Variable)) +
@@ -1233,30 +1233,29 @@ dataplot_vip_stats <- left_join(dataplot_vip_mean, dataplot_vip_sd,
   # Relevel the factor to get the variables in the right order
   mutate(Variable = as_factor(Variable)) %>%
   # relevel the factor in descending order of variable importance
-  mutate(Variable = fct_relevel(Variable, 'NO3.NO2', 'NH4', 'SIOH', 'TEMP', 'PO4', 'ssr',  
-                                'SALI', 'Stratification_Index', 'OXYGENE', 'Allo', 
-                                'CHLOROA', 'tcc', 'Mesodinium_genus', 'u10', 'v10'))
+  mutate(Variable = fct_relevel(Variable, 'ssr', 'TEMP', 'NH4', 'NO3.NO2', 'v10',  'SIOH', 'PO4',   
+                                'Allo', 'OXYGENE', 'SALI', 'tcc', 'CHLOROA', 'Stratification_Index',   
+                                'u10', 'Mesodinium_genus'))
 
 # Relevel dataplot_vip_tidy variables for the dot plot
 dataplot_vip_tidy <- dataplot_vip_tidy %>%
   mutate(Variable = as_factor(Variable)) %>%
-  mutate(Variable = fct_relevel(Variable, 'NO3.NO2', 'NH4', 'SIOH', 'TEMP', 'PO4', 'ssr',  
-                                'SALI', 'Stratification_Index', 'OXYGENE', 'Allo', 
-                                'CHLOROA', 'tcc', 'Mesodinium_genus', 'u10', 'v10'))
+  mutate(Variable = fct_relevel(Variable, 'ssr', 'TEMP', 'NH4', 'NO3.NO2', 'v10',  'SIOH', 'PO4',   
+                                'Allo', 'OXYGENE', 'SALI', 'tcc', 'CHLOROA', 'Stratification_Index',   
+                                'u10', 'Mesodinium_genus'))
 
-# Color palette with new order
-palette_bretagne16 <- c('#FC4D6B', '#FF6448', '#DEB1CC', 'red3', '#8B064B', '#FBA823',  
-                        '#11203E', '#377185', '#2A56A1', '#9DA51E', '#1F3700', 
-                        '#B47E24', '#711412', '#FBB646', '#FBB665')
+# Color palette with new order --> Not used
+# palette_bretagne16 <- c('#FC4D6B', '#FF6448', '#DEB1CC', 'red3', '#8B064B', '#FBA823',  
+#                         '#11203E', '#377185', '#2A56A1', '#9DA51E', '#1F3700', 
+#                         '#B47E24', '#711412', '#FBB646', '#FBB665')
 
 # Plot with mean +- sd
-ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean, 
-                                      fill = Variable)) +
+ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean)) +
+  
   # all data points for 20 model runs
-  geom_point(data = dataplot_vip_tidy, aes(x = Variable, y = value, 
-                                           color = Variable),
+  geom_point(data = dataplot_vip_tidy, aes(x = Variable, y = value),
              position = position_jitter(width = .1),
-             alpha = .4, size = 1.5) +
+             alpha = .4, size = 1.5, color = 'grey10') +
   
   # error bars
   geom_errorbar(aes(x = Variable, ymin = value.mean - value.sd,
@@ -1264,12 +1263,12 @@ ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean,
                 color = 'grey10', width = .2) +
   
   # points for means
-  geom_point(size = 4, color = 'grey10',
+  geom_point(size = 4, color = 'black', fill = 'grey45',
              shape = 21, stroke = .5) +
   
   # Color scales
-  scale_fill_discrete(type = palette_bretagne16, guide = 'none') +
-  scale_color_discrete(type = palette_bretagne16, guide = 'none') +
+  # scale_fill_discrete(type = palette_bretagne16, guide = 'none') +
+  # scale_color_discrete(type = palette_bretagne16, guide = 'none') +
   # Custom label for y axis
   labs(x = NULL, y = 'Variable importance score') +
   # Flip x and y axes
@@ -1279,5 +1278,5 @@ ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean,
   theme_classic()
 
 # Save the plot
-# ggsave('Plots/RF_models/VIP_RandomForest2_meansd_20250626.tiff', width = 164, 
+# ggsave('Plots/RF_models/VIP_RandomForest2_meansd_20251105.tiff', width = 164,
 #        height = 180, units = 'mm', compression = 'lzw', dpi = 300)

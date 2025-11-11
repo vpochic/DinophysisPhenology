@@ -1,6 +1,6 @@
 ###### GAM for Mesodinium phenology with mgcv ###
 ## V. POCHIC
-# 2025-06-04
+# 2025-11-07
 
 # This is more or less the same script than for the Dinophysis GAM, but for 
 # its ciliate prey Mesodinium. We restrict the analysis to 4 sites (in Southern
@@ -281,50 +281,49 @@ qq_data_reordered <- qq_data %>%
 qqplot_custom <- ggplot(qq_data_reordered) +
   stat_qq(aes(sample=Residuals, color = Code_point_Libelle), alpha = .7) +
   stat_qq_line(aes(sample=Residuals, color = Code_point_Libelle)) +
-  facet_wrap(facets = c('Code_point_Libelle')) +
+  facet_wrap(facets = c('Code_point_Libelle'), nrow =1) +
   scale_color_discrete(type = pheno_palette4, guide = 'none') +
   theme_classic() +
-  labs(title = 'qq-plot for Mesodinium GAM (2016-2022)', 
+  labs(title = NULL, 
        y="Sample Quantiles",x="Theoretical Quantiles")
 
 qqplot_custom
 
 # Save the plot
-# ggsave('Plots/GAMs/Mesodinium/qqplot_Meso_custom_4sites.tiff', dpi = 300, height = 175, width = 250,
+# ggsave('Plots/GAMs/Mesodinium/qqplot_Meso_custom_4sites.tiff', dpi = 300, height = 55, width = 164,
 #                units = 'mm', compression = 'lzw')
 
 # We can do the same for residuals vs fitted
 RvFplot_custom <- ggplot(qq_data_reordered)+
-  geom_point(aes(x=Fitted,y=Residuals, color  =Code_point_Libelle), 
+  geom_point(aes(x=Fitted,y=Residuals, color = Code_point_Libelle), 
              alpha = .7) +
-  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free') +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free', nrow = 1) +
   scale_color_discrete(type = pheno_palette4, guide = 'none') +
   theme_classic() +
-  labs(title = 'RvF-plot for Mesodinium GAM (2016-2022)',
+  labs(title = NULL,
        y="Residuals",x="Fitted Values")
 
 RvFplot_custom
 
 # Save the plot
-# ggsave('Plots/GAMs/Mesodinium/RvFplot_custom_4sites.tiff', dpi = 300, 
-# height = 175, width = 250, units = 'mm', compression = 'lzw')
+# ggsave('Plots/GAMs/Mesodinium/RvFplot_custom_4sites.tiff', dpi = 300,
+# height = 55, width = 164, units = 'mm', compression = 'lzw')
 
 # And let's do one last diagnostic plot with histogram of residuals
 HistRes_custom <- ggplot(qq_data_reordered, aes(x = Residuals, 
                                                 fill = Code_point_Libelle))+
   geom_histogram(binwidth = 1)+
-  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free') +
+  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free', nrow = 1) +
   scale_fill_discrete(type = pheno_palette4, guide = 'none') +
   theme_classic() +
-  labs(title = 'Histogram of residuals for 
-Mesodinium GAM (2016-2022)',
+  labs(title = NULL,
        x='Residuals', y = 'Count')
 
 HistRes_custom
 
 # Save the plot
 # ggsave('Plots/GAMs/Mesodinium/HistRes_custom_4sites.tiff', dpi = 300,
-# height = 175, width = 250,  units = 'mm', compression = 'lzw')
+# height = 55, width = 164,  units = 'mm', compression = 'lzw')
 
 #### Confidence intervals ####
 

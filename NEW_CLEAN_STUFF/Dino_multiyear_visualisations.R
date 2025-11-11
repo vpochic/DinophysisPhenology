@@ -1,6 +1,6 @@
 ###### Dinophysis phenology: visualisations on multiple years ###
 ## V. POCHIC
-# 2025-10-14
+# 2025-11-07
 
 # Additional visualisations using the results of GAM, REPHY data and satellite
 # observations, to observe Dinophysis dynamics over several years
@@ -12,6 +12,7 @@ library(ggnewscale)
 library(viridis)
 library(cmocean)
 library(RColorBrewer)
+library(ggpubr)
 
 #### Import data ####
 
@@ -829,7 +830,7 @@ ggplot(Maxima_Dino_2_stats_select) +
   # Chl a: fill = 'Median [chl a] (mg/m3)',
   # Stratif: fill = 'Median Stratification Index (-)'
   # ssr: fill = 'Mean Surface Solar Radiation (J/m2)'
-  labs(x = 'Day of the year', y = NULL, fill = fill = 'Mean Surface Solar Radiation (J/m2)',
+  labs(x = 'Day of the year', y = NULL, fill = 'Mean Surface Solar Radiation (J/m2)',
        title = 'Maxima of Dinophysis counts (2007-2022)') +
   
   # New fill scale for points
@@ -903,7 +904,8 @@ GAM_peak_plot <- left_join(GAM_peak_plot, Maxima_Dino_2_stats_select,
            c('Antifer ponton pétrolier', 'Cabourg',
              'Men er Roue', 'Ouest Loscolo',
              'Le Cornard', 'Auger',
-             'Arcachon - Bouée 7', 'Teychan bis'))
+             'Arcachon - Bouée 7', 'Teychan bis')) %>%
+  mutate(shape = ifelse(period == 1, 5, 6))
 
 # And new version of the plot
 ggplot(GAM_peak_plot) +
@@ -927,7 +929,7 @@ ggplot(GAM_peak_plot) +
   # Stratif: fill = 'Median Stratification Index (-)'
   # ssr: fill = 'Mean Surface Solar Radiation (J/m2)'
   labs(x = 'Day of the year', y = NULL, fill = 'Mean Surface Solar Radiation (J/m2)') +
-  geom_tile(data = Table_hydro_daily_select, 
+  geom_tile(data = Table_ssr_daily_select, 
             aes(x = Day, y = Code_point_Libelle, fill = ssr), #fill = TEMP.med, 
             # fill = CHLOROA.med, fill = SALI.med, fill = ssr
             alpha = .8) +
@@ -947,12 +949,13 @@ ggplot(GAM_peak_plot) +
   
   # All maxima as smaller translucid points
   geom_point(data = Maxima_Dino_select, aes(x = Day, y = Code_point_Libelle, 
-                                            color = Code_point_Libelle, shape = shape), 
+                                            color = Code_point_Libelle, 
+                                            shape = as_factor(shape)), 
              size = 2.5, alpha = .5) +
   
   # points for GAM peak
   geom_point(aes(y = Code_point_Libelle, x = Daymax, 
-                 fill = Code_point_Libelle, shape = shape), 
+                 fill = Code_point_Libelle, shape = as_factor(shape)), 
              size = 4, color = 'grey10', stroke = .5) +
   
   # Color scales
@@ -963,6 +966,7 @@ ggplot(GAM_peak_plot) +
   # reverse y axis to get sites in the desired order
   scale_y_discrete(limits = rev) +
   scale_x_continuous(limits = c(1,365), breaks = c(1, 100, 200, 300, 365)) +
+  scale_shape_manual(values = c(16, 17, 1, 2, 21, 24), guide = 'none') +
   
   # Theme
   theme(plot.title = element_text(size = 11), 
@@ -1169,10 +1173,10 @@ pheno_palette7 <- c('red3', 'orangered', '#2156A1', '#5995E3',
 
 ## Plotting the heatmap, maxima and GAM peaks
 # 5 versions of the plot : temperature/chl a/salinity/stratification/ssr heatmaps
-ggplot() +
-  geom_tile(data = Table_hydro_daily_RF, # Table_hydro_daily_RF ; 
+plot_ssr <- ggplot() +
+  geom_tile(data = Table_ssr_daily_RF, # Table_hydro_daily_RF ; 
             # Table_stratif_daily_RF ; Table_ssr_daily_RF
-            aes(x = Day, y = Code_point_Libelle, fill = SALI.med), 
+            aes(x = Day, y = Code_point_Libelle, fill = ssr), 
             # fill = TEMP.med ; fill = CHLOROA.med ; fill = SALI.med ; 
             # fill = SI_date.med ; fill = ssr
             alpha = .8) +
@@ -1184,9 +1188,9 @@ ggplot() +
   # Chl a version
   # scale_fill_cmocean(name = 'algae') +
   # Salinity version
-  scale_fill_cmocean(name = 'haline') +
+  # scale_fill_cmocean(name = 'haline') +
   # ssr version
-  # scale_fill_cmocean(name = 'solar') +
+  scale_fill_cmocean(name = 'solar') +
   
   # Add labels here so the name of the 'fill' legend is correct
   # Labels for 
@@ -1195,7 +1199,7 @@ ggplot() +
   # Salinity: fill = 'Median Salinity (PSU)',
   # Stratif: fill = 'Median Stratification Index (-)',
   # SSR: fill = 'Mean Surface Solar Radiation (J/m2)',
-  labs(x = 'Day of the year', y = NULL, fill = 'Median Stratification Index (-)',
+  labs(x = 'Day of the year', y = NULL, fill = 'Mean Surface Solar Radiation (J/m2)',
        title = NULL) +
   
   # New fill scale for points
@@ -1231,16 +1235,20 @@ ggplot() +
   # Theme
   theme(plot.title = element_text(size = 11), 
         # Axis
-        axis.title.x = element_text(size=10), 
-        axis.title.y =element_text(size=10), 
-        axis.text = element_text(size=8, color = 'black'),
+        axis.title.x = element_text(size=8), 
+        axis.title.y =element_text(size=8),
+        axis.text = element_text(size=6, color = 'black'),
+        # Alternative text axis for paper figure
+        # axis.text.x = element_text(size=6, color = 'black'),
+        # axis.text.y = element_blank(),
         axis.line.x = element_line(linewidth = .2, color = 'black'),
         axis.line.y = element_line(linewidth = .2, color = 'black'),
         # Legend
-        legend.background = element_rect(linewidth = .5, color = 'grey10'),
-        legend.title = element_text(size = 10, color = 'grey5'),
-        legend.frame = element_rect(linewidth = .5, color = 'grey10'),
-        legend.ticks = element_line(linewidth = .2, color = 'grey25'),
+        legend.background = element_rect(linewidth = .25, color = 'grey10'),
+        legend.title = element_text(size = 6, color = 'grey5'),
+        legend.frame = element_rect(linewidth = .25, color = 'grey10'),
+        legend.ticks = element_line(linewidth = .15, color = 'grey25'),
+        legend.text = element_text(size = 6, color = 'grey5'),
         legend.position = 'bottom',
         # Panel
         panel.grid = element_blank(),
@@ -1252,8 +1260,18 @@ ggplot() +
         strip.text = element_text(color = 'grey5', size = 7.5))
 
 # Great! Let's save that
-# ggsave('Plots/REPHY/Dino_gam_max_SALI_RF.tiff', dpi = 300, height = 180, width = 100,
+# ggsave('Plots/REPHY/Dino_gam_max_ssr_RF_plot.tiff', dpi = 600, height = 150, width = 100,
 #        units = 'mm', compression = 'lzw')
+
+# For paper figure: plot 4 heatmaps side by side
+plot_4heatmaps <- ggarrange(plot_temp, plot_chloroa, plot_sali, plot_stratif,
+                            nrow = 2, ncol = 2,
+                            align = 'hv', legend = 'bottom')
+
+plot_4heatmaps
+
+ggsave('Plots/REPHY/Dino_4heatmaps_plot.tiff', dpi = 600, height = 160, width = 134,
+       units = 'mm', compression = 'lzw')
 
 ### Plotting maxima by latitude ####
 
@@ -1356,6 +1374,71 @@ ggplot() +
 # Save this plot: maxima depending on latitude
 # ggsave('Dino_max_lat_GAM_peak.tiff', dpi = 300, height = 180, width = 150,
 #        units = 'mm', compression = 'lzw')
+
+# Color palette for all sites
+pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered', 
+                     '#0A1635', '#2B4561', '#2156A1', '#5995E3', 
+                     '#1F3700', '#649003','#F7B41D', '#FBB646',
+                     '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
+
+
+
+# Same plot as before but with NewDay as x
+ggplot(data  = subset(Maxima_Dino_2, 
+                      Code_point_Libelle %in% c('Point 1 Boulogne','At so',
+                                                'Antifer ponton pétrolier', 'Cabourg',
+                                                'les Hébihens', 'Loguivy',
+                                                'Men er Roue', 'Ouest Loscolo',
+                                                'Le Cornard', 'Auger',
+                                                'Arcachon - Bouée 7', 'Teychan bis')), 
+       aes(x = Day, y = Latitude, color = Code_point_Libelle, 
+           shape = as.factor(shape))) +
+  # First the points for maxima of each year
+  geom_point(size = 2.5, alpha = .8) +
+  
+  # Then the bigger points for the GAM
+  geom_point(data = GAM_peak_plot, aes(y = median.lat.y, x = Daymax, 
+                 fill = Code_point_Libelle, shape = as_factor(shape)), 
+             size = 4, color = 'grey10', stroke = .5) +
+  
+  # then add linear regression fit for some sites only and only with n_max > 1
+  # over the period
+  # geom_smooth(data = subset(Maxima_Dino_2, max_Dino > 1 & n_max > 1 &
+  #                             Code_point_Libelle %in% 
+  #                             c('Antifer ponton pétrolier', 'Cabourg',
+  #                               'Men er Roue', 'Ouest Loscolo',
+  #                               'Le Cornard', 'Auger',
+  #                               'Arcachon - Bouée 7', 'Teychan bis',
+  #                               'Bouzigues (a)', 'Sète mer',
+  #                               'Diana centre')),
+  #             aes(x = Year, y = Day, color = Code_point_Libelle),
+  #             method = 'lm', alpha = .25, linewidth = .5) +
+  
+  # Special one for Parc Leucate
+  # geom_smooth(data = subset(Maxima_Dino_2,
+  #                           Code_point_Libelle == 'Parc Leucate 2' &
+  #                             period == 1),
+  #             aes(x = Year, y = Day),color = '#642C3A',
+  #             method = 'lm', alpha = .25, linewidth = .5) +
+  # aesthetics
+  # facet_wrap(facets = 'Code_point_Libelle', nrow = 4) +
+  scale_x_continuous(limits = c(1, 365), 
+                     breaks = c(1, 100, 200, 300, 365)) +
+  
+  # Color scale for all
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  # fill scale for all
+  scale_fill_discrete(type = pheno_palette8, guide = 'none') +
+  # Scale for shape
+  scale_shape_manual(values = c(16, 17, 1, 2, 21, 24), guide = 'none') +
+  # labels
+  labs(y = 'Latitude',
+       x = 'Day of maximum Dinophysis count (DOY)') +
+  theme_classic()
+
+# Save that good s***
+# ggsave('Plots/REPHY/Dino_maxima_by_latitude.tiff', dpi = 300, height = 150, width = 100,
+#                units = 'mm', compression = 'lzw')
 
 ### Focusing on Ouest Loscolo - different years ####
 

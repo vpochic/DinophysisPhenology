@@ -1,6 +1,6 @@
 ###### GAM for Dinophysis phenology with mgcv - unified 2 ###
 ## V. POCHIC
-# 2025-10-18
+# 2025-11-08
 
 # In this version of the script we add the sites in Pas de Calais 
 # ('Point 1 Boulogne' and 'At so') and in Northern Britanny ('les Hébihens' and 
@@ -719,7 +719,7 @@ qqplot_custom <- ggplot(qq_data_reordered) +
 qqplot_custom
 
 # Save the plot
-# ggsave('qqplot_custom_16sites.tiff', dpi = 300, height = 175, width = 250,
+# ggsave('Plots/GAMS/Dinophysis/qqplot_custom_16sites.tiff', dpi = 300, height = 164, width = 164,
 #                units = 'mm', compression = 'lzw')
 
 # We can do the same for residuals vs fitted
@@ -734,7 +734,7 @@ RvFplot_custom <- ggplot(qq_data_reordered)+
 RvFplot_custom
 
 # Save the plot
-# ggsave('RvFplot_custom_16sites.tiff', dpi = 300, height = 175, width = 250,
+# ggsave('Plots/GAMS/Dinophysis/RvFplot_custom_16sites.tiff', dpi = 300, height = 164, width = 164,
 #                units = 'mm', compression = 'lzw')
 
 # And let's do one last diagnostic plot with histogram of residuals
@@ -749,7 +749,7 @@ HistRes_custom <- ggplot(qq_data_reordered, aes(x = Residuals,
 HistRes_custom
 
 # Save the plot
-# ggsave('HistRes_custom_16sites.tiff', dpi = 300, height = 175, width = 250,
+# ggsave('Plots/GAMS/Dinophysis/HistRes_custom_16sites.tiff', dpi = 300, height = 164, width = 164,
 #                units = 'mm', compression = 'lzw')
 
 #### Confidence intervals ####
@@ -944,16 +944,20 @@ pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered',
                      '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
 
 # Import 'response_pred_plot' if necessary
-response_pred_plot <- read.csv2('response_pred_plot_20241120_16sites.csv',
-                                header = TRUE, fileEncoding = 'ISO-8859-1')
+response_pred_plot <- read.csv2('Data/GAM_outputs/Dinophysis/All_sites/response_pred_GAMDino_20250604.csv',
+                                header = TRUE, fileEncoding = 'ISO-8859-1') %>%
+  # Summarise everything on 1 year
+  group_by(Day, Code_point_Libelle) %>%
+  summarise(median.fit = median(fit), uprS = max(uprS), lwrS = min(lwrS), .groups = 'keep')
 
 # And Season_Dino
-Season_Dino <- read.csv2('Season_Dino.csv',
+Season_Dino <- read.csv2('Data/REPHY_outputs/Season_Dino_20250604.csv',
                          header = TRUE, fileEncoding = 'ISO-8859-1')
 
 # Reordering the factor 'Code_point_Libelle' so that the sites appear in the
 # plot in the desired order
 response_pred_plot <- response_pred_plot %>%
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
   mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
                                           'Point 1 Boulogne', 'At so',
                                           'Antifer ponton pétrolier', 'Cabourg',
@@ -966,6 +970,7 @@ response_pred_plot <- response_pred_plot %>%
 
 # And do the exact same thing in the Season_Dino dataset
 Season_Dino <- Season_Dino %>%
+  mutate(Code_point_Libelle = as_factor(Code_point_Libelle)) %>%
   mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
                                           'Point 1 Boulogne', 'At so',
                                           'Antifer ponton pétrolier', 'Cabourg',
@@ -1088,21 +1093,18 @@ ggplot(response_pred_plot, aes(x = Day, y = median.fit,
 # ggsave('gam_Dino_16sites_crop.tiff', dpi = 300, height = 175, width = 250,
 #        units = 'mm', compression = 'lzw')
 
-# This is quite nice, but Arcachon and Teychan samples are not the same volume
-# as others (10 times more), so the scale is misleading.
-# We need to plot the data as cells.L to rectify this.
+# Reminder: we multiply by 100 for *all sites*, because the sampling inconsistencies
+# in the Arcachon bay sites have been dealt with already (when creating the
+# true_count variable)
 
 pred_plot_cells_per_L <- response_pred_plot %>%
-  mutate(across(-c('Code_point_Libelle', 'Day'), ~ ifelse(
-    # Si
-    Code_point_Libelle == 'Arcachon - Bouée 7' |
-      # Ou
-      Code_point_Libelle == 'Teychan bis',
-    # Alors
-    .*10,
+  mutate(across(c('median.fit', 'uprS', 'lwrS'), ~ 
     # Sinon
     .*100
-  )))
+  ))
+
+Season_Dino_cells_per_L <- Season_Dino_crop %>%
+  mutate(Dino_cells_per_L = true_count*100)
 
 # New plot in cells per L
 
@@ -1114,22 +1116,27 @@ ggplot(pred_plot_cells_per_L, aes(x = Day, y = median.fit,
   #           alpha = 0.1, colour = "grey20") +
   geom_path(lwd = 1) +
   # scale_y_continuous(limits = c(0,40)) +
-  geom_point(data = Season_Dino_crop, aes(x = Day, y = Dinophysis_genus), 
+  geom_point(data = Season_Dino_cells_per_L, aes(x = Day, y = Dino_cells_per_L), 
              size = .8, alpha = .5) +
   labs(y = c(expression(paste("Dinophysis cells.L"^'-1'))),
        x = "Day of the year",
-       title = "Poisson GAM of Dinophysis phenology" #,
-       #subtitle = sprintf("Each line is one of %i draws from the Bayesian posterior distribution of the model", nrnd)
+       title = NULL
   ) +
+  # Add a "ghost point" to force the minimum y-axis range to 5
+  geom_point(aes(x = 1, y = 250), color = 'transparent', fill = 'transparent',
+             size = .8, alpha = .5) +
+  
+  # Facet wrap
   facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
   # Set the color palette :
-  scale_color_discrete(type = pheno_palette13, guide = 'none') +
-  scale_fill_discrete(type = pheno_palette13, guide = 'none') +
+  scale_color_discrete(type = pheno_palette16, guide = 'none') +
+  scale_fill_discrete(type = pheno_palette16, guide = 'none') +
   theme_classic()
 
 # Saving plot
-ggsave('gam_Dino_allsites_crop_cells_per_L.tiff', dpi = 300, height = 270, width = 300,
-       units = 'mm', compression = 'lzw')
+# ggsave('Plots/GAMs/Dinophysis/gam_Dino_allsites_crop_cells_per_L.tiff',
+#        dpi = 300, height = 135, width = 164,
+#        units = 'mm', compression = 'lzw')
 
 # Checking how many of the N simulations fit entirely in the
 # 1) point-wise confidence interval
