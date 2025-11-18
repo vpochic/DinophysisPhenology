@@ -1,6 +1,6 @@
 ### GAMs of pigment concentrations ###
 # Part of the Dinophysis Phenology project
-# V. POCHIC 2025-11-07
+# V. POCHIC 2025-11-12
 
 ### Required packages ####
 
@@ -1083,7 +1083,29 @@ gam_Meso_MeR <- filter(gam_Meso, Code_point_Libelle == 'Men er Roue')
 gam_Meso_OL <- filter(gam_Meso, Code_point_Libelle == 'Ouest Loscolo')
 
 # Alloxanthin data as well!
-# Import data
+# Raw data
+Table_pigments <- read.csv2('Data/REPHY_outputs/Table_pigments_2007-2022.csv', header = TRUE,
+                            fileEncoding = 'ISO-8859-1')
+
+# Select points of interest for Dinophysis phenology
+Table_pigments_select <- filter(Table_pigments, Code_point_Libelle %in%
+                                  c('Antifer ponton pétrolier', 'Cabourg',
+                                    'Men er Roue', 'Ouest Loscolo')) %>%
+  mutate(Code_point_Libelle = fct_relevel(Code_point_Libelle,
+                                          'Antifer ponton pétrolier', 'Cabourg',
+                                          'Men er Roue', 'Ouest Loscolo'))
+# Alloxanthin
+Table_Allo <- Table_pigments_select %>%
+  # Remove NAs
+  filter(is.na(Allo) == FALSE)
+
+# Transform Year as a factor for the random effect
+Table_Allo_factor <- Table_Allo %>%
+  mutate(Year = as_factor(Year)) %>%
+  # And evacuate 4 dates for which the alloxanthin concentration is 0 (unlikely)
+  filter(Allo > 0)
+
+# GAM data
 gam_Allo_plot <- read.csv2('Data/GAM_outputs/Pigments/allo/response_pred_plot_Allo_20250704.csv',
                            header = TRUE, fileEncoding = 'ISO-8859-1')
 
@@ -1196,7 +1218,7 @@ plot_Allo_Antifer <- ggplot() +
              alpha = .3, color = 'red3') +
   # plot the GAM
   geom_ribbon(data = gam_Allo_Antifer, aes(x = Day, ymin = lwrP, 
-                                              ymax = uprP),
+                                           ymax = uprP),
               linewidth = .35, alpha = .2,
               color = 'red3', fill = 'red3') +
   geom_line(data = gam_Allo_Antifer, aes(x = Day, y = median.fit),
@@ -1204,9 +1226,9 @@ plot_Allo_Antifer <- ggplot() +
   # cut the y scale at 22
   #scale_y_continuous(limits = c(0,22)) +
   # Text
-  labs(title = 'Antifer',
-       subtitle = 'Alloxanthin (microgram.L-1)', x = NULL, 
-       y = NULL) +
+  labs(# title = 'A. Antifer',
+    subtitle = 'Alloxanthin (micrograms.L-1)', x = NULL, 
+    y = NULL) +
   theme_classic()
 
 plot_Allo_Antifer
@@ -1214,17 +1236,21 @@ plot_Allo_Antifer
 # Mesodinium
 plot_Meso_Antifer <- ggplot() +
   # plot the data as points
-  geom_point(data = Season_Meso_Antifer, aes(x = Day, y = true_count), size = 2,
+  geom_point(data = Season_Meso_Antifer, aes(x = Day, y = true_count*100), size = 2,
              alpha = .3, color = 'red3') +
   # plot the GAM
-  geom_ribbon(data = gam_Meso_Antifer, aes(x = Day, ymin = lwrS, 
-                                           ymax = uprS),
+  geom_ribbon(data = gam_Meso_Antifer, aes(x = Day, ymin = lwrS*100, 
+                                           ymax = uprS*100),
               linewidth = .35, alpha = .2,
               color = 'red3', fill = 'red3') +
-  geom_line(data = gam_Meso_Antifer, aes(x = Day, y = median.fit),
+  geom_line(data = gam_Meso_Antifer, aes(x = Day, y = median.fit*100),
             linewidth = .7, color = 'red3') +
+  # Satellite observations of Mesodinium blooms
+  geom_point(data = subset(Satellite_survey_Meso, Code_point_Libelle == 'Cabourg'),
+             aes(x = Day, y = 2000),
+             color = 'firebrick4', shape = 8, size = 3.5, stroke = .45) +
   # Text
-  labs(subtitle = 'Mesodinium (cells counted)', x = NULL, 
+  labs(subtitle = 'Mesodinium (cells per L)', x = NULL, 
        y = NULL) +
   theme_classic()
 
@@ -1233,28 +1259,29 @@ plot_Meso_Antifer
 # Dinophysis
 plot_Dino_Antifer <- ggplot() +
   # plot the data as points
-  geom_point(data = Season_Dino_Antifer, aes(x = Day, y = true_count), size = 2,
+  geom_point(data = Season_Dino_Antifer, aes(x = Day, y = true_count*100), size = 2,
              alpha = .3, color = 'red3') +
   # plot the GAM
-  geom_ribbon(data = gam_Dino_Antifer, aes(x = Day, ymin = lwrS, 
-                                           ymax = uprS),
+  geom_ribbon(data = gam_Dino_Antifer, aes(x = Day, ymin = lwrS*100, 
+                                           ymax = uprS*100),
               linewidth = .35, alpha = .2,
               color = 'red3', fill = 'red3') +
-  geom_line(data = gam_Dino_Antifer, aes(x = Day, y = median.fit),
+  geom_line(data = gam_Dino_Antifer, aes(x = Day, y = median.fit*100),
             linewidth = .7, color = 'red3') +
   # Text
-  labs(subtitle = 'Dinophysis (cells counted)', x = 'Julian day', y = NULL) +
+  labs(subtitle = 'Dinophysis (cells per L)', x = 'Day of the year', y = NULL) +
   theme_classic()
 
 plot_Dino_Antifer
 
 # Arrange the plot
-ggarrange(plot_Allo_Antifer, plot_Meso_Antifer, plot_Dino_Antifer, nrow = 3,
-          align = 'v')
+succession_Antifer <- ggarrange(plot_Allo_Antifer, plot_Meso_Antifer, plot_Dino_Antifer, nrow = 3,
+                            align = 'v')
 
 # Save the plot
-# ggsave('Plots/GAMs/Successions/Succession_plot_Antifer.tiff', height = 270, width = 140,
-#                dpi = 300, unit = 'mm', compression = 'lzw')
+# ggsave('Plots/GAMs/Successions/Succession_plot_Antifer_pub.tiff', 
+#        height = 130, width = 82, dpi = 300, unit = 'mm', compression = 'lzw')
+
 
 ## Men er Roue ####
 
@@ -1265,7 +1292,7 @@ plot_Allo_MeR <- ggplot() +
              alpha = .3, color = '#2156A1') +
   # plot the GAM
   geom_ribbon(data = gam_Allo_MeR, aes(x = Day, ymin = lwrP, 
-                                           ymax = uprP),
+                                      ymax = uprP),
               linewidth = .35, alpha = .2,
               color = '#2156A1', fill = '#2156A1') +
   geom_line(data = gam_Allo_MeR, aes(x = Day, y = median.fit),
@@ -1273,9 +1300,10 @@ plot_Allo_MeR <- ggplot() +
   # cut the y scale at 22
   #scale_y_continuous(limits = c(0,22)) +
   # Text
-  labs(title = 'Men er Roue',
-       subtitle = 'Alloxanthin (microgram.L-1)', x = NULL, 
-       y = NULL) +
+  labs(# title = 'B. Ouest LoscMeRo',
+    subtitle = '',
+    x = NULL, # subtitle = 'Alloxanthin (microgram.L-1)', 
+    y = NULL) +
   theme_classic()
 
 plot_Allo_MeR
@@ -1283,17 +1311,22 @@ plot_Allo_MeR
 # Mesodinium
 plot_Meso_MeR <- ggplot() +
   # plot the data as points
-  geom_point(data = Season_Meso_MeR, aes(x = Day, y = true_count), size = 2,
+  geom_point(data = Season_Meso_MeR, aes(x = Day, y = true_count*100), size = 2,
              alpha = .3, color = '#2156A1') +
   # plot the GAM
-  geom_ribbon(data = gam_Meso_MeR, aes(x = Day, ymin = lwrS, 
-                                           ymax = uprS),
+  geom_ribbon(data = gam_Meso_MeR, aes(x = Day, ymin = lwrS*100, 
+                                      ymax = uprS*100),
               linewidth = .35, alpha = .2,
               color = '#2156A1', fill = '#2156A1') +
-  geom_line(data = gam_Meso_MeR, aes(x = Day, y = median.fit),
+  geom_line(data = gam_Meso_MeR, aes(x = Day, y = median.fit*100),
             linewidth = .7, color = '#2156A1') +
+  # Satellite observations of Mesodinium blooms
+  geom_point(data = subset(Satellite_survey_Meso, Code_point_Libelle == 'Ouest Loscolo'),
+             aes(x = Day, y = 25000),
+             color = 'firebrick4', shape = 8, size = 3.5, stroke = .45) +
   # Text
-  labs(subtitle = 'Mesodinium (cells counted)', x = NULL, 
+  labs(subtitle = '',
+       x = NULL, # subtitle = 'Mesodinium (cells counted)',
        y = NULL) +
   theme_classic()
 
@@ -1302,28 +1335,29 @@ plot_Meso_MeR
 # Dinophysis
 plot_Dino_MeR <- ggplot() +
   # plot the data as points
-  geom_point(data = Season_Dino_MeR, aes(x = Day, y = true_count), size = 2,
+  geom_point(data = Season_Dino_MeR, aes(x = Day, y = true_count*100), size = 2,
              alpha = .3, color = '#2156A1') +
   # plot the GAM
-  geom_ribbon(data = gam_Dino_MeR, aes(x = Day, ymin = lwrS, 
-                                           ymax = uprS),
+  geom_ribbon(data = gam_Dino_MeR, aes(x = Day, ymin = lwrS*100, 
+                                      ymax = uprS*100),
               linewidth = .35, alpha = .2,
               color = '#2156A1', fill = '#2156A1') +
-  geom_line(data = gam_Dino_MeR, aes(x = Day, y = median.fit),
+  geom_line(data = gam_Dino_MeR, aes(x = Day, y = median.fit*100),
             linewidth = .7, color = '#2156A1') +
   # Text
-  labs(subtitle = 'Dinophysis (cells counted)', x = 'Julian day', y = NULL) +
+  labs(subtitle = '', 
+       x = 'Day of the year', y = NULL) + # subtitle = 'Dinophysis (cells counted)', 
   theme_classic()
 
 plot_Dino_MeR
 
 # Arrange the plot
-ggarrange(plot_Allo_MeR, plot_Meso_MeR, plot_Dino_MeR, nrow = 3,
-          align = 'v')
+succession_MeR <- ggarrange(plot_Allo_MeR, plot_Meso_MeR, plot_Dino_MeR, nrow = 3,
+                           align = 'v')
 
 # Save the plot
-# ggsave('Plots/GAMs/Successions/Succession_plot_MeR.tiff', height = 270, width = 140,
-#                dpi = 300, unit = 'mm', compression = 'lzw')
+# ggsave('Plots/GAMs/Successions/Succession_plot_MeR_pub.tiff', 
+#        height = 130, width = 82, dpi = 300, unit = 'mm', compression = 'lzw')
 
 ## Ouest Loscolo ####
 
@@ -1388,7 +1422,7 @@ plot_Dino_OL <- ggplot() +
             linewidth = .7, color = '#5995E3') +
   # Text
   labs(subtitle = '', 
-       x = 'Julian day', y = NULL) + # subtitle = 'Dinophysis (cells counted)', 
+       x = 'Day of the year', y = NULL) + # subtitle = 'Dinophysis (cells counted)', 
   theme_classic()
 
 plot_Dino_OL
@@ -1419,7 +1453,7 @@ plot_Allo_Cabourg <- ggplot() +
   #scale_y_continuous(limits = c(0,22)) +
   # Text
   labs(# title = 'A. Cabourg',
-       subtitle = 'Alloxanthin (microgram.L-1)', x = NULL, 
+       subtitle = '', x = NULL, 
        y = NULL) +
   theme_classic()
 
@@ -1442,7 +1476,7 @@ plot_Meso_Cabourg <- ggplot() +
              aes(x = Day, y = true_count*300),
              color = 'firebrick4', shape = 8, size = 3.5, stroke = .45) +
   # Text
-  labs(subtitle = 'Mesodinium (cells per L)', x = NULL, 
+  labs(subtitle = '', x = NULL, 
        y = NULL) +
   theme_classic()
 
@@ -1461,7 +1495,7 @@ plot_Dino_Cabourg <- ggplot() +
   geom_line(data = gam_Dino_Cabourg, aes(x = Day, y = median.fit*100),
             linewidth = .7, color = 'orangered') +
   # Text
-  labs(subtitle = 'Dinophysis (cells per L)', x = 'Julian day', y = NULL) +
+  labs(subtitle = '', x = 'Day of the year', y = NULL) +
   theme_classic()
 
 plot_Dino_Cabourg
@@ -1479,7 +1513,48 @@ succession_Cab <- ggarrange(plot_Allo_Cabourg, plot_Meso_Cabourg, plot_Dino_Cabo
 ggarrange(succession_Cab, succession_OL, nrow = 1,
           align = 'h')
 
-# ggsave('Plots/Figures_article/version_1/Figure5_succession_plot_Cab_OL.tiff',
+# ggsave('Plots/GAMs/Successions/Succession_plot_Cab_OL_2.tiff',
+#        width = 154, height = 170, units = 'mm', dpi = 300, compression = 'lzw')
+
+### Little bonus: getting peak dates for the 3 GAMs
+# Cabourg
+
+max_allo_cab <- gam_Allo_Cabourg %>%
+  filter(median.fit == max(gam_Allo_Cabourg$median.fit))
+
+max_meso_cab <- gam_Meso_Cabourg %>%
+  filter(median.fit == max(gam_Meso_Cabourg$median.fit))
+
+max_dino_cab <- gam_Dino_Cabourg %>%
+  filter(median.fit == max(gam_Dino_Cabourg$median.fit))
+
+# Ouest Loscolo
+# Because this one is "double-peak" style, we need to first isolate the first or
+# second peak, depending on the one we want. Here we isolate the first peak, just
+# need to reverse '<=' to '>=' to get the second.
+
+gam_Allo_OL_1 <- gam_Allo_OL %>%
+  filter(Day <= 200)
+gam_Meso_OL_1 <- gam_Meso_OL %>%
+  filter(Day <= 200)
+gam_Dino_OL_1 <- gam_Dino_OL %>%
+  filter(Day <= 225)
+
+max_allo_OL <- gam_Allo_OL %>%
+  filter(median.fit == max(gam_Allo_OL_1$median.fit))
+
+max_meso_OL <- gam_Meso_OL %>%
+  filter(median.fit == max(gam_Meso_OL_1$median.fit))
+
+max_dino_OL <- gam_Dino_OL %>%
+  filter(median.fit == max(gam_Dino_OL_1$median.fit))
+
+## Antifer + Men er Roue (publication style) ####
+
+ggarrange(succession_Antifer, succession_MeR, nrow = 1,
+          align = 'h')
+
+# ggsave('Plots/GAMs/Successions/Succession_plot_Antifer_MeR.tiff',
 #        width = 164, height = 170, units = 'mm', dpi = 300, compression = 'lzw')
 
 ## Cabourg + Ouest Loscolo (video style) ####
