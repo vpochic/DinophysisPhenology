@@ -1,6 +1,6 @@
 ### GAMs of pigment concentrations ###
 # Part of the Dinophysis Phenology project
-# V. POCHIC 2025-11-12
+# V. POCHIC 2025-11-18
 
 ### Required packages ####
 
@@ -1227,7 +1227,7 @@ plot_Allo_Antifer <- ggplot() +
   #scale_y_continuous(limits = c(0,22)) +
   # Text
   labs(# title = 'A. Antifer',
-    subtitle = 'Alloxanthin (micrograms.L-1)', x = NULL, 
+    subtitle = '', x = NULL, 
     y = NULL) +
   theme_classic()
 
@@ -1250,7 +1250,7 @@ plot_Meso_Antifer <- ggplot() +
              aes(x = Day, y = 2000),
              color = 'firebrick4', shape = 8, size = 3.5, stroke = .45) +
   # Text
-  labs(subtitle = 'Mesodinium (cells per L)', x = NULL, 
+  labs(subtitle = '', x = NULL, 
        y = NULL) +
   theme_classic()
 
@@ -1269,7 +1269,7 @@ plot_Dino_Antifer <- ggplot() +
   geom_line(data = gam_Dino_Antifer, aes(x = Day, y = median.fit*100),
             linewidth = .7, color = 'red3') +
   # Text
-  labs(subtitle = 'Dinophysis (cells per L)', x = 'Day of the year', y = NULL) +
+  labs(subtitle = '', x = 'Day of the year', y = NULL) +
   theme_classic()
 
 plot_Dino_Antifer
@@ -1555,7 +1555,7 @@ ggarrange(succession_Antifer, succession_MeR, nrow = 1,
           align = 'h')
 
 # ggsave('Plots/GAMs/Successions/Succession_plot_Antifer_MeR.tiff',
-#        width = 164, height = 170, units = 'mm', dpi = 300, compression = 'lzw')
+#        width = 154, height = 170, units = 'mm', dpi = 300, compression = 'lzw')
 
 ## Cabourg + Ouest Loscolo (video style) ####
 
