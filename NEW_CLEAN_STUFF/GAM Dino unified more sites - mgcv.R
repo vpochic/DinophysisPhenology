@@ -1,6 +1,6 @@
 ###### GAM for Dinophysis phenology with mgcv - unified 2 ###
 ## V. POCHIC
-# 2025-11-08
+# 2025-11-18
 
 # In this version of the script we add the sites in Pas de Calais 
 # ('Point 1 Boulogne' and 'At so') and in Northern Britanny ('les Hébihens' and 
@@ -1131,7 +1131,8 @@ ggplot(pred_plot_cells_per_L, aes(x = Day, y = median.fit,
   # Set the color palette :
   scale_color_discrete(type = pheno_palette16, guide = 'none') +
   scale_fill_discrete(type = pheno_palette16, guide = 'none') +
-  theme_classic()
+  theme_classic() +
+  theme(strip.text.x = element_text(size = 7.2, colour = "black"))
 
 # Saving plot
 # ggsave('Plots/GAMs/Dinophysis/gam_Dino_allsites_crop_cells_per_L.tiff',
