@@ -1,6 +1,6 @@
 ### CPR data for Dinophysis phenology ###
 
-# V. POCHIC, 2025-11-19
+# V. POCHIC, 2025-12-11
 
 # This script is made for plotting and analysing data from the CPR.
 
@@ -10,6 +10,7 @@ library(tidyverse)
 library(viridis)
 library(cmocean)
 library(ggnewscale)
+library(deeptime)
 library(ggmap)
 library(mapdata)
 library(maps)
@@ -193,8 +194,8 @@ CPR_data_max <- CPR_data_binned %>%
   # Create a date variable in date format
   mutate(Date = paste(Year, Month, Day, sep = '-')) %>%
   mutate(Date = ymd(Date)) %>%
-  # Get a julian day variable
-  mutate(Julian_day = yday(Date))
+  # Get a day of the year variable
+  mutate(DOY = yday(Date))
 
 ## Plot the month of the recorded maximum for each bin where Dinophysis was
 # observed
@@ -302,21 +303,21 @@ CPR_data_Dino <- CPR_data %>%
   # Create a date variable in date format
   mutate(Date = paste(Year, Month, Day, sep = '-')) %>%
   mutate(Date = ymd(Date)) %>%
-  # Get a julian day variable
-  mutate(Julian_day = yday(Date))
+  # Get a day of the year variable
+  mutate(DOY = yday(Date))
 
 # Plot it as a dotplot
 ggplot() +
   # Observations without Dinophysis
   geom_point(data = subset(CPR_data_Dino, Dinophysis_Total == 0),
-             aes(x = Julian_day, y = Latitude), color = 'gray70', alpha = .95) +
+             aes(x = DOY, y = Latitude), color = 'gray70', alpha = .95) +
   # Observations with Dinophysis
   geom_point(data = subset(CPR_data_Dino, Dinophysis_Total>0),
-             aes(x = Julian_day, y = Latitude, color = log10(Dinophysis_Total)), 
+             aes(x = DOY, y = Latitude, color = log10(Dinophysis_Total)), 
              size = 2.5,
              alpha = .8) +
   scale_color_viridis() +
-  labs(y = 'Latitude (degrees)', x = 'Julian day of observation',
+  labs(y = 'Latitude (degrees)', x = 'DOY of observation',
        title = "Dino observations (day vs latitude)")+
   theme_classic() +
   theme(legend.position = 'bottom')
@@ -401,8 +402,8 @@ CPR_data_regions <- CPR_data_binned %>%
   # Create an appropriate date variable
   mutate(Date = paste(Year, Month, Day, sep = '-')) %>%
   mutate(Date = ymd(Date)) %>%
-  # Get a julian day variable
-  mutate(Julian_day = yday(Date)) %>%
+  # Get a day of the year variable
+  mutate(DOY = yday(Date)) %>%
   # Creating "week" and "fortnight" variables
   mutate(Week = week(Date)) %>%
   # 'ceiling' takes the upper integer of a decimal number
@@ -559,7 +560,7 @@ ggplot() +
 ggplot(data = subset(CPR_data_regions, region > 0)) +
   # Here we try to divide by the lowest number of Dinophysis recorded, to get
   # a somewhat continuous distribution of our data.
-  geom_point(aes(x = Julian_day, y = (Dinophysis_Total/15000),
+  geom_point(aes(x = DOY, y = (Dinophysis_Total/15000),
                  color = as_factor(region))) +
   facet_wrap(facets = 'region', scales = 'free_y') +
   scale_color_discrete(guide = 'none') +
@@ -580,9 +581,9 @@ CPR_data_max <- CPR_data_regions %>%
 
 # Plot the seasonality of Dinophysis depending on the region
 ggplot(data = subset(CPR_data_max, region > 0)) +
-  geom_point(aes(x = Julian_day, y = Latitude,
+  geom_point(aes(x = DOY, y = Latitude,
                  color = log10(Dinophysis_Total))) +
-  geom_smooth(aes(x = Julian_day, y = Latitude),
+  geom_smooth(aes(x = DOY, y = Latitude),
               method = 'lm', alpha = .3) +
   facet_wrap(facets = 'region', scales= 'free_y') +
   scale_color_viridis() +
@@ -623,10 +624,17 @@ CPR_data_hovmoller <- CPR_data_hovmoller %>%
 ### First, let's create a Hovmoller diagram of sampling effort in the different 
 # regions
 
+# Let's add color to the background of the facets
+# For this, we need a dataframe that links names of regions with specific colors
+# The name of the columns in the dataframe is super important here!
+df_color <- data.frame(name = 1:4, 
+                       color = c('orange1', 'royalblue2', 'red4', 'forestgreen'))
+# Ok nice
+
 ggplot(data = subset(CPR_data_hovmoller, region > 0)) +
   geom_tile(aes(x = Year, y = Month, fill = log10(nsamples+1))) +
   scale_fill_viridis(option = 'plasma') +
-  facet_wrap(facets = 'region') +
+  facet_wrap_color(facets = 'region', colors = df_color) +
   scale_y_continuous(limits = c(0, 13), 
                      breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
   labs(title = 'Sampling effort over the study period,
@@ -645,7 +653,7 @@ ggplot(data = subset(CPR_data_hovmoller, region > 0)) +
   geom_tile(aes(x = Year, y = Month, fill = log(prop_pos+1))) +
   scale_fill_viridis(breaks = c(log(0+1), log(0.1+1), log(0.25+1), (log(0.5+1))),
                      labels = c('0', '0.1', '0.25', '0.5')) +
-  facet_wrap(facets = 'region') +
+  facet_wrap_color(facets = 'region', colors = df_color) +
   scale_y_continuous(limits = c(0, 13), 
                      breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
   labs(title = 'Dinophysis seasonality by region, CPR data',
@@ -689,13 +697,13 @@ ggplot() +
   geom_rect(data = subset(CPR_data_sum, nsamples>=3),
             aes(xmin = lon.bin-.25, xmax = lon.bin+.25,
                 ymin = lat.bin-.25, ymax = lat.bin+.25, # width = .5, height = .5,
-                fill = log10(nsamples))) + #log(prop_pos+1)
+                fill = log(prop_pos+1))) + #log10(nsamples)
   # adjust the limits of the color scale so it is compatible with the second
   # plot. No legend here.
-  scale_fill_viridis(option = 'plasma'
-    # limits = c(0, 0.694),
-    # breaks = c(log(0+1), log(0.1+1), log(0.25+1), (log(0.5+1))),
-    # labels = c('0', '0.1', '0.25', '0.5'), guide = 'none'
+  scale_fill_viridis(#option = 'plasma'
+    limits = c(0, 0.694),
+    breaks = c(log(0+1), log(0.1+1), log(0.25+1), (log(0.5+1))),
+    labels = c('0', '0.1', '0.25', '0.5'), guide = 'none'
     ) +
   # Plotting the land
   geom_polygon(data = Worldmap, aes(x = long, y = lat, group = group), 
@@ -741,18 +749,21 @@ ggplot(data = subset(CPR_data_hovmoller, region > 0)) +
     # breaks = c(log(0+1), log(0.1+1), log(0.25+1), log(0.5+1), log(2)),
     #                  labels = c('0', '0.1', '0.25', '0.5', '1')
     ) +
-  facet_wrap(facets = 'region') +
+  facet_wrap_color(facets = 'region', colors = df_color) +
   scale_y_continuous(limits = c(0, 13), 
                      breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
   labs(title = 'B',
-       fill = 'Sampling effort 
-(number of samples, log10)'
-#        'Dinophysis presence 
+       fill = 'Sampling effort
+number of samples (log10)'
+#        'Dinophysis presence
 # (proportion of samples,
 # log scale)'
        ) +
   theme_classic() +
-  theme(legend.position = 'bottom')
+  theme(legend.position = 'bottom',
+        legend.frame = element_rect(color = 'black'),
+        legend.ticks = element_line(color = 'black'),
+        legend.background = element_rect(fill = 'white', color = 'black'))
 
 # Save that!
 # ggsave('Plots/CPR/CPR_Hovmoller_sampling_effort_4regions_pub.tiff', height = 125, width = 164, units = 'mm',

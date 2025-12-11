@@ -1,6 +1,6 @@
 ###### Dinophysis phenology: visualisations on multiple years ###
 ## V. POCHIC
-# 2025-11-07
+# 2025-12-11
 
 # Additional visualisations using the results of GAM, REPHY data and satellite
 # observations, to observe Dinophysis dynamics over several years
@@ -408,47 +408,51 @@ pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered',
 
 # Same plot as before but with NewDay as x
 ggplot(data  = Maxima_Dino_2, 
-       aes(x = Year, y = Day, color = Code_point_Libelle, 
+       aes(y = Year, x = Day, color = Code_point_Libelle, 
            shape = as.factor(shape))) +
   # First the points
   geom_point(size = 2.5, alpha = .8) +
   
+  ## Update (2025/12/11) no more linear regression for the swapped plot
   # then add linear regression fit for some sites only and only with n_max > 1
   # over the period
-  geom_smooth(data = subset(Maxima_Dino_2, max_Dino > 1 & n_max > 1 &
-                            Code_point_Libelle %in% 
-                              c('Antifer ponton pétrolier', 'Cabourg',
-                                'Men er Roue', 'Ouest Loscolo',
-                                'Le Cornard', 'Auger',
-                                'Arcachon - Bouée 7', 'Teychan bis',
-                                'Bouzigues (a)', 'Sète mer',
-                                'Diana centre')),
-              aes(x = Year, y = Day, color = Code_point_Libelle),
-              method = 'lm', alpha = .25, linewidth = .5) +
-  
+  # geom_smooth(data = subset(Maxima_Dino_2, max_Dino > 1 & n_max > 1 &
+  #                           Code_point_Libelle %in%
+  #                             c('Antifer ponton pétrolier', 'Cabourg',
+  #                               'Men er Roue', 'Ouest Loscolo',
+  #                               'Le Cornard', 'Auger',
+  #                               'Arcachon - Bouée 7', 'Teychan bis',
+  #                               'Bouzigues (a)', 'Sète mer',
+  #                               'Diana centre')),
+  #             aes(y = Year, x = Day, color = Code_point_Libelle),
+  #             method = 'lm', alpha = .25, linewidth = .5) +
+
   # Special one for Parc Leucate
-  geom_smooth(data = subset(Maxima_Dino_2,
-                            Code_point_Libelle == 'Parc Leucate 2' &
-                              period == 1),
-              aes(x = Year, y = Day),color = '#642C3A',
-              method = 'lm', alpha = .25, linewidth = .5) +
-  # aesthetics
-  facet_wrap(facets = 'Code_point_Libelle', nrow = 4) +
-  scale_y_continuous(limits = c(1, 365), 
-                     breaks = c(1, 100, 200, 300, 365)) +
+  # geom_smooth(data = subset(Maxima_Dino_2,
+  #                           Code_point_Libelle == 'Parc Leucate 2' &
+  #                             period == 1),
+  #             aes(y = Year, x = Day),color = '#642C3A',
+  #             method = 'lm', alpha = .25, linewidth = .5) +
+  # 
+  # # aesthetics
+  # facet_wrap(facets = 'Code_point_Libelle', nrow = 4) +
+  # scale_x_continuous(limits = c(1, 365), 
+  #                    breaks = c(1, 100, 200, 300, 365)) +
+  # scale_y_continuous(limits = c(2007, 2022), 
+  #                    breaks = c(2007, 2010, 2015, 2020, 2022)) +
   
   # Color scale for all
   scale_color_discrete(type = pheno_palette16, guide = 'none') +
   # Scale for shape
   scale_shape_manual(values = c(16, 17, 1, 2), guide = 'none') +
   # labels
-  labs(y = 'Day of maximum Dinophysis count (DOY)') +
+  labs(x = 'Day of maximum Dinophysis count (DOY)') +
   theme_classic()
 
 # This seems pretty good!
 # Let's save that
-# ggsave('Plots/REPHY/Maxima_Dinophysis_16_sites.tiff',
-#        dpi = 300, height = 125, width = 164, units = 'mm', compression = 'lzw')
+# ggsave('Plots/REPHY/Maxima_Dinophysis_16_sites_swapped.tiff',
+#        dpi = 300, height = 140, width = 164, units = 'mm', compression = 'lzw')
 
 #### Hovmoller diagrams ####
 
