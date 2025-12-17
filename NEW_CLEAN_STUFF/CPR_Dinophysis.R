@@ -1,6 +1,6 @@
 ### CPR data for Dinophysis phenology ###
 
-# V. POCHIC, 2025-12-11
+# V. POCHIC, 2025-12-17
 
 # This script is made for plotting and analysing data from the CPR.
 
@@ -509,7 +509,7 @@ pheno_palette16 <- c('sienna4', 'tan3', 'red3', 'orangered',
                      '#1F3700', '#649003','#F7B41D', '#FBB646',
                      '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
 
-# COlor palette for the CPR-defined regions
+# Color palette for the CPR-defined regions
 palette_regions4 <- c('orange1', 'royalblue2', 'red4', 'forestgreen')
 
 ggplot() +
@@ -520,7 +520,7 @@ ggplot() +
                 fill = log10(mean_Dino+1)*prop_pos*log10(nsamples+1))) +
   # adjust the limits of the color scale because of some extremes (prop_pos = 1)
   # that dwarf the rest
-  scale_fill_viridis() +
+  scale_fill_viridis(limits = c) +
   # Plotting the land
   geom_polygon(data = Worldmap, aes(x = long, y = lat, group = group), 
                fill = "grey80", color = 'gray10', linewidth = .25)+
@@ -701,10 +701,9 @@ ggplot() +
   # adjust the limits of the color scale so it is compatible with the second
   # plot. No legend here.
   scale_fill_viridis(#option = 'plasma'
-    limits = c(0, 0.694),
+    limits = c(0, log(0.5+1)),
     breaks = c(log(0+1), log(0.1+1), log(0.25+1), (log(0.5+1))),
-    labels = c('0', '0.1', '0.25', '0.5'), guide = 'none'
-    ) +
+    labels = c('0', '0.1', '0.25', '0.5')) +
   # Plotting the land
   geom_polygon(data = Worldmap, aes(x = long, y = lat, group = group), 
                fill = "grey80", color = 'gray10', linewidth = .25)+
@@ -733,31 +732,39 @@ ggplot() +
   labs(title = 'A',
        y = 'Latitude (degrees)', x = 'Longitude (degrees)',
        # title = "Dinophysis in the NE Atlantic (CPR data)"
+       fill = 
+       'Dinophysis presence
+(proportion of samples,
+log scale)'
        )+
   theme_bw() +
-  theme(legend.position = 'bottom')
+  theme(legend.position = 'bottom',
+        legend.frame = element_rect(color = 'black'),
+        legend.ticks = element_line(color = 'black'),
+        legend.background = element_rect(fill = 'white', color = 'black'))
 
 # Save the map
-# ggsave('Plots/CPR/CPR_sampling_effort_map_composite_pub.tiff', height = 200, width = 164,
+# ggsave('Plots/CPR/CPR_Dinophysis_map_composite_pub_05.tiff', height = 200, width = 164,
 #        units = 'mm', dpi = 300, compression = 'lzw')
 
 # Then, the Hovmoller diagram
 ggplot(data = subset(CPR_data_hovmoller, region > 0)) +
-  geom_tile(aes(x = Year, y = Month, fill = log10(nsamples))) + # log(prop_pos+1)
-  scale_fill_viridis(option = 'plasma'
-    # limits = c(0,0.694),
-    # breaks = c(log(0+1), log(0.1+1), log(0.25+1), log(0.5+1), log(2)),
-    #                  labels = c('0', '0.1', '0.25', '0.5', '1')
+  geom_tile(aes(x = Year, y = Month, fill = log(prop_pos+1))) + # log10(nsamples)
+  scale_fill_viridis(#option = 'plasma'
+    limits = c(0, log(2)),
+    breaks = c(log(0+1), log(0.1+1), log(0.25+1), log(0.5+1), log(2)), #
+                      labels = c('0', '0.1', '0.25', '0.5', '1') #
     ) +
   facet_wrap_color(facets = 'region', colors = df_color) +
   scale_y_continuous(limits = c(0, 13), 
                      breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
   labs(title = 'B',
-       fill = 'Sampling effort
-number of samples (log10)'
-#        'Dinophysis presence
-# (proportion of samples,
-# log scale)'
+       fill = 
+#        'Sampling effort
+# number of samples (log10)'
+       'Dinophysis presence
+(proportion of samples,
+log scale)'
        ) +
   theme_classic() +
   theme(legend.position = 'bottom',
@@ -766,7 +773,7 @@ number of samples (log10)'
         legend.background = element_rect(fill = 'white', color = 'black'))
 
 # Save that!
-# ggsave('Plots/CPR/CPR_Hovmoller_sampling_effort_4regions_pub.tiff', height = 125, width = 164, units = 'mm',
+# ggsave('Plots/CPR/CPR_Hovmoller_Dinophysis_4regions_pub.tiff', height = 125, width = 164, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
 ### Hovmoller diagrams by fortnight (does not work well) ####

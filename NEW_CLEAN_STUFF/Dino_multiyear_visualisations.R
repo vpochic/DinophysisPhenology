@@ -1,6 +1,6 @@
 ###### Dinophysis phenology: visualisations on multiple years ###
 ## V. POCHIC
-# 2025-12-11
+# 2025-12-17
 
 # Additional visualisations using the results of GAM, REPHY data and satellite
 # observations, to observe Dinophysis dynamics over several years
@@ -434,12 +434,12 @@ ggplot(data  = Maxima_Dino_2,
   #             aes(y = Year, x = Day),color = '#642C3A',
   #             method = 'lm', alpha = .25, linewidth = .5) +
   # 
-  # # aesthetics
-  # facet_wrap(facets = 'Code_point_Libelle', nrow = 4) +
-  # scale_x_continuous(limits = c(1, 365), 
-  #                    breaks = c(1, 100, 200, 300, 365)) +
-  # scale_y_continuous(limits = c(2007, 2022), 
-  #                    breaks = c(2007, 2010, 2015, 2020, 2022)) +
+  # aesthetics
+  facet_wrap(facets = 'Code_point_Libelle', nrow = 4) +
+  scale_x_continuous(limits = c(1, 365),
+                     breaks = c(1, 100, 200, 300, 365)) +
+  scale_y_continuous(limits = c(2007, 2022),
+                     breaks = c(2007, 2010, 2015, 2020, 2022)) +
   
   # Color scale for all
   scale_color_discrete(type = pheno_palette16, guide = 'none') +
@@ -453,6 +453,113 @@ ggplot(data  = Maxima_Dino_2,
 # Let's save that
 # ggsave('Plots/REPHY/Maxima_Dinophysis_16_sites_swapped.tiff',
 #        dpi = 300, height = 140, width = 164, units = 'mm', compression = 'lzw')
+
+### Statistical evaluation of trends ####
+
+# We want to test statistically if there are linear trends in the timing of 
+# Dinophysis maxima
+
+# Very simple: our response variable is day of Dino max (DOY), our predictor is
+# the Year
+
+# We'll do GLMs, with the help of the tutorial by Dr. Bede Davies
+# https://bedeffinianrowedavies.com/statisticstutorials/poissonglms
+
+# We still have an issue with the winter peak at Parc Leucate 2. We'll 
+# circumvent it with the new day trick.
+Maxima_Dino_trends <- Maxima_Dino_2 %>%
+  # Only interesting sampling sites
+  filter(Code_point_Libelle %in% 
+    c('Antifer ponton pétrolier', 'Cabourg',
+    'Men er Roue', 'Ouest Loscolo',
+    'Le Cornard', 'Auger',
+    'Arcachon - Bouée 7', 'Teychan bis',
+    'Parc Leucate 2', 'Bouzigues (a)', 'Sète mer',
+    'Diana centre')) %>%
+  mutate(NewDay = ifelse(Day <= 35, Day + 365, Day)) %>%
+  # create an x-trend variable to use as the predictor
+  # that's equal to NewDay in the problematic situation we identified,
+  # or equal to Day for everything else
+  mutate(y_trend = ifelse(Code_point_Libelle == 'Parc Leucate 2' &
+                            period == 2, NewDay, Day)) %>%
+  # And create a category variable that is the sampling site + the period
+  mutate(category = paste(Code_point_Libelle, period, sep = "_")) %>%
+  # Relevel as a factor
+  mutate(category = as_factor(category)) %>%
+  mutate(category = fct_relevel(category,
+                                        'Antifer ponton pétrolier_1', 'Cabourg_1',
+                                        'Men er Roue_1', 'Men er Roue_2',
+                                        'Ouest Loscolo_1', 'Ouest Loscolo_2',
+                                        'Le Cornard_1', 'Le Cornard_2', 
+                                        'Auger_1', 'Auger_2',
+                                        'Arcachon - Bouée 7_1', 'Arcachon - Bouée 7_2', 
+                                        'Teychan bis_1', 'Teychan bis_2',
+                                        'Parc Leucate 2_1', 'Parc Leucate 2_2',
+                                        'Bouzigues (a)_1', 'Bouzigues (a)_2',
+                                        'Sète mer_1', 'Sète mer_2',
+                                        'Diana centre_1', 'Diana centre_2'))
+
+# Now, we'll do GLMs for every series of maxima (1 for each period in each 
+# sampling site)
+
+glm_trends <- glm(y_trend~Year*category,data=Maxima_Dino_trends, family= "poisson")
+
+summary(glm_trends)
+
+# Let's predict with the GLM
+NewData_1 <- expand_grid(# Year variable
+                         Year=seq(min(Maxima_Dino_trends$Year), 
+                                  max(Maxima_Dino_trends$Year)),
+                         # We also add the site data
+                         category = unique(Maxima_Dino_trends$category))
+
+Pred <- predict(glm_trends, NewData_1, se.fit=TRUE, type="response")
+
+NewData<-NewData_1 %>% 
+  mutate(response=Pred$fit,
+         se.fit=Pred$se.fit,
+         Upr=response+(se.fit*1.96),
+         Lwr=response-(se.fit*1.96))
+
+# Join datasets of prediction and true data
+Data_trends <- left_join(Maxima_Dino_trends, NewData)
+
+# Plot
+ggplot(Data_trends)+
+  # confidence interval of model
+  geom_ribbon(aes(x = Year,
+                  ymax = Upr,
+                  ymin = Lwr,
+                  fill=Code_point_Libelle, 
+                  group = category),
+              alpha=0.5) +
+  # fit of model
+  geom_line(aes(x = Year,
+                y = response,
+                color=Code_point_Libelle,
+                group = category)) +
+  # true data
+  geom_point(aes(x = Year, y = y_trend, color = Code_point_Libelle, 
+                 shape = as_factor(shape))) +
+  # color scales
+  scale_color_discrete(palette = pheno_palette12, guide = 'none') +
+  scale_fill_discrete(palette = pheno_palette12, guide = 'none') +
+  # shape scale
+  scale_shape_manual(values = c(16, 17, 1, 2), guide = 'none') +
+  # y-axis scale
+  scale_y_continuous(limits = c(1, 410), 
+                     breaks = c(1, 100, 200, 300, 365)) +
+  # Labels
+  labs(x = "Year", 
+       y = "Day of maximum Dinophysis count") +
+  facet_wrap(facets = 'Code_point_Libelle') +
+  theme_classic() +
+  theme(strip.text = element_text(
+    size = 7, color = 'black'))
+
+# Good sh*t
+# ggsave('Plots/REPHY/Trends_maxima_Dino.tiff', dpi = 300, height = 150, width = 164,
+#                units = 'mm', compression = 'lzw')
 
 #### Hovmoller diagrams ####
 
