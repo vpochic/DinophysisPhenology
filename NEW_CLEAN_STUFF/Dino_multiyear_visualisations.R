@@ -1,12 +1,14 @@
 ###### Dinophysis phenology: visualisations on multiple years ###
 ## V. POCHIC
-# 2025-12-17
+# 2025-12-18
 
 # Additional visualisations using the results of GAM, REPHY data and satellite
 # observations, to observe Dinophysis dynamics over several years
 
 #### Packages and functions ####
 library(tidyverse)
+library(broom)
+library(mgcv)
 library(ggplot2)
 library(ggnewscale)
 library(viridis)
@@ -499,12 +501,95 @@ Maxima_Dino_trends <- Maxima_Dino_2 %>%
                                         'Sète mer_1', 'Sète mer_2',
                                         'Diana centre_1', 'Diana centre_2'))
 
+
+# Let's try to transform our response variable so it follows a beta distribution
+# (bounded between 0 and 1)
+Maxima_Dino_trends <- Maxima_Dino_trends %>%
+  mutate(y_trend_beta = y_trend/max(Maxima_Dino_trends$y_trend))
+
 # Now, we'll do GLMs for every series of maxima (1 for each period in each 
 # sampling site)
+# With the beta-transformed variable (we'll use mgcv's gam( function))
+glm_trends_beta <- gam(y_trend_beta~Year*category,
+                       data = Maxima_Dino_trends, 
+                       family = betar(link="logit"))
+summary(glm_trends_beta)
 
-glm_trends <- glm(y_trend~Year*category,data=Maxima_Dino_trends, family= "poisson")
+### Diagnostic plots ###
 
-summary(glm_trends)
+### Checking the model
+ModelOutputs<-data.frame(Fitted=fitted(glm_trends_beta),
+                         Residuals=resid(glm_trends_beta))
+
+# We're gonna make our own qq plot with colors identifying sites
+# We base it on the structure of the model
+qq_data <- glm_trends_beta$model
+# then we add the values of fitted and residuals 
+# (but are they in the same order as the model? -> need to check that)
+qq_data <- bind_cols(qq_data, ModelOutputs)
+
+# Reorder data
+qq_data_reordered <- qq_data %>%
+  mutate(category = fct_relevel(category,
+                                          'Antifer ponton pétrolier_1', 'Cabourg_1',
+                                          'Men er Roue_1', 'Men er Roue_2',
+                                          'Ouest Loscolo_1', 'Ouest Loscolo_2',
+                                          'Le Cornard_1', 'Le Cornard_2',
+                                          'Auger_1', 'Auger_2',
+                                          'Arcachon - Bouée 7_1', 'Arcachon - Bouée 7_2',
+                                          'Teychan bis_1', 'Teychan bis_2',
+                                          'Parc Leucate 2_1', 'Parc Leucate 2_2',
+                                          'Bouzigues (a)_1', 'Bouzigues (a)_2',
+                                          'Sète mer_1', 'Sète mer_2', 
+                                          'Diana centre_1', 'Diana centre_2')) %>%
+  # we ungroup the data frame to produce only 1 qq-plot
+  ungroup()
+
+# And (qq-)plot
+qqplot_custom <- ggplot(qq_data_reordered) +
+  stat_qq(aes(sample=Residuals, color = category), alpha = .7) +
+  stat_qq_line(aes(sample=Residuals, color = category)) +
+  facet_wrap(facets = c('category')) +
+  scale_color_discrete(guide = 'none') +
+  theme_classic() +
+  labs(y="Sample Quantiles",x="Theoretical Quantiles")
+
+qqplot_custom
+
+# Okish
+
+# We can do the same for residuals vs fitted
+RvFplot_custom <- ggplot(qq_data_reordered)+
+  geom_point(aes(x=Fitted,y=Residuals, color = category), 
+             alpha = .7) +
+  facet_wrap(facets = c('category'), scales = 'free') +
+  scale_color_discrete(guide = 'none') +
+  theme_classic() +
+  labs(y="Residuals",x="Fitted Values")
+
+RvFplot_custom
+
+# Okish
+
+# And let's do one last diagnostic plot with histogram of residuals
+HistRes_custom <- ggplot(qq_data_reordered, aes(x = Residuals, 
+                                                fill = category))+
+  geom_histogram(binwidth = 1)+
+  facet_wrap(facets = c('category'), scales = 'free') +
+  scale_fill_discrete(guide = 'none') +
+  theme_classic() +
+  labs(x='Residuals', y = 'Count')
+
+HistRes_custom
+
+# For some sites it's not that great...
+#For others it's very good
+
+# Exporting the summary of the GLM as a table
+summary_glm_trends_beta <- tidy(glm_trends_beta, parametric = TRUE, smooth = FALSE)
+
+# write.csv2(summary_glm_trends_beta, 'Data/GLM_outputs/summary_glm_trends_beta.csv',
+#            row.names = FALSE, fileEncoding = 'ISO-8859-1')
 
 # Let's predict with the GLM
 NewData_1 <- expand_grid(# Year variable
@@ -513,7 +598,7 @@ NewData_1 <- expand_grid(# Year variable
                          # We also add the site data
                          category = unique(Maxima_Dino_trends$category))
 
-Pred <- predict(glm_trends, NewData_1, se.fit=TRUE, type="response")
+Pred <- predict(glm_trends_beta, NewData_1, se.fit=TRUE, type="response")
 
 NewData<-NewData_1 %>% 
   mutate(response=Pred$fit,
@@ -524,18 +609,19 @@ NewData<-NewData_1 %>%
 # Join datasets of prediction and true data
 Data_trends <- left_join(Maxima_Dino_trends, NewData)
 
-# Plot
+# Plot (we multiply the predictions made on the beta-transformed variable
+# by a factor so that it fits the true data)
 ggplot(Data_trends)+
   # confidence interval of model
   geom_ribbon(aes(x = Year,
-                  ymax = Upr,
-                  ymin = Lwr,
+                  ymax = Upr*max(Maxima_Dino_trends$y_trend),
+                  ymin = Lwr*max(Maxima_Dino_trends$y_trend),
                   fill=Code_point_Libelle, 
                   group = category),
-              alpha=0.5) +
+              alpha=0.35) +
   # fit of model
   geom_line(aes(x = Year,
-                y = response,
+                y = response*max(Maxima_Dino_trends$y_trend),
                 color=Code_point_Libelle,
                 group = category)) +
   # true data
@@ -558,7 +644,7 @@ ggplot(Data_trends)+
     size = 7, color = 'black'))
 
 # Good sh*t
-# ggsave('Plots/REPHY/Trends_maxima_Dino.tiff', dpi = 300, height = 150, width = 164,
+# ggsave('Plots/REPHY/Trends_maxima_Dino_beta.tiff', dpi = 300, height = 150, width = 164,
 #                units = 'mm', compression = 'lzw')
 
 #### Hovmoller diagrams ####
