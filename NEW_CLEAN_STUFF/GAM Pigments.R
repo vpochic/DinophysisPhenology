@@ -1,6 +1,6 @@
 ### GAMs of pigment concentrations ###
 # Part of the Dinophysis Phenology project
-# V. POCHIC 2025-11-18
+# V. POCHIC 2025-12-18
 
 ### Required packages ####
 
@@ -1166,8 +1166,10 @@ Satellite_survey_LV <- read.csv2('Data/Satellite/Blooms_list_satellite_Vilaine-G
 # Let's focus on Mesodinium in the Loire-Atlantique region
 Satellite_survey_Meso_LV <- filter(Satellite_survey_LV,
                                 (grepl('Mesodinium', Main.species) |
-                                   grepl('Mesodinium', Comment)) &
-                                  Region == 'Loire Atlantique') %>%
+                                   grepl('Mesodinium', Comment) |
+                                    grepl('Dark red', Comment)) &
+                                  Region == 'Loire Atlantique' &
+                                  Satellite == 'S2') %>%
   # Add the date information that we will need for plotting
   mutate(Date = ymd(Date)) %>%
   mutate(Year = year(Date)) %>%
@@ -1279,7 +1281,7 @@ succession_Antifer <- ggarrange(plot_Allo_Antifer, plot_Meso_Antifer, plot_Dino_
                             align = 'v')
 
 # Save the plot
-# ggsave('Plots/GAMs/Successions/Succession_plot_Antifer_pub.tiff', 
+# ggsave('Plots/GAMs/Successions/Succession_plot_Antifer_pub.tiff',
 #        height = 130, width = 82, dpi = 300, unit = 'mm', compression = 'lzw')
 
 
@@ -1356,7 +1358,7 @@ succession_MeR <- ggarrange(plot_Allo_MeR, plot_Meso_MeR, plot_Dino_MeR, nrow = 
                            align = 'v')
 
 # Save the plot
-# ggsave('Plots/GAMs/Successions/Succession_plot_MeR_pub.tiff', 
+# ggsave('Plots/GAMs/Successions/Succession_plot_MeR_pub.tiff',
 #        height = 130, width = 82, dpi = 300, unit = 'mm', compression = 'lzw')
 
 ## Ouest Loscolo ####
@@ -1432,7 +1434,7 @@ succession_OL <- ggarrange(plot_Allo_OL, plot_Meso_OL, plot_Dino_OL, nrow = 3,
           align = 'v')
 
 # Save the plot
-# ggsave('Plots/GAMs/Successions/Succession_plot_OL_pub.tiff', 
+# ggsave('Plots/GAMs/Successions/Succession_plot_OL_pub.tiff',
 #        height = 130, width = 82, dpi = 300, unit = 'mm', compression = 'lzw')
 
 ## Cabourg ####
@@ -1505,7 +1507,7 @@ succession_Cab <- ggarrange(plot_Allo_Cabourg, plot_Meso_Cabourg, plot_Dino_Cabo
           align = 'v')
 
 # Save the plot
-# ggsave('Plots/GAMs/Successions/Succession_plot_Cabourg_pub.tiff', 
+# ggsave('Plots/GAMs/Successions/Succession_plot_Cabourg_pub.tiff',
 #        height = 130, width = 82, dpi = 300, unit = 'mm', compression = 'lzw')
 
 ## Cabourg + Ouest Loscolo (publication style) ####
