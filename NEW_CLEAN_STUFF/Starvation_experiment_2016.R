@@ -1,6 +1,6 @@
-#### Starvation experiment (2016) - cell counts ###
+#### Starvation experiments - cell counts ###
 ## Experiment and data collection by T. Lacour, Script by V. Pochic
-# 2025-07-21
+# 2025-12-22
 
 # packages ####
 library(tidyverse)
@@ -10,6 +10,10 @@ library(stringr)
 Exp_data  <- read.csv2('Data/Starvation_Experiment/2016/Cell_counts_starv_exp_2016.csv',
                        header = TRUE, fileEncoding = 'ISO-8859-1')
 
+Exp_data_2024 <- read.csv2('Data/Starvation_Experiment/2024/Cell_counts_dinophysis_starvation_2024.csv',
+                           header = TRUE, fileEncoding = 'ISO-8859-1')
+
+## 2016 Experiment ####
 # Curate data ####
 
 # The data contains 3 conditions, each one in triplicate.
@@ -78,4 +82,40 @@ ggplot(data = Exp_data_stats_plot) +
 
 # Nice! Save that
 # ggsave('Plots/Experiments/Starvation_exp_2016_celldens.tiff',
+#        dpi = 300, height = 85, width = 164, units = 'mm', compression = 'lzw')
+
+## 2024 Experiment ####
+
+# Curate data
+Exp_data_2024 <- Exp_data_2024 %>%
+  group_by(Day, Condition)
+
+# Color palette
+palette_expbis <- c('orangered3', 'dodgerblue4')
+
+# Plot data
+ggplot(data = Exp_data_2024) +
+  # First, the individual points for each condition
+  geom_point(aes(x = Day, y = Cell_density, color = Condition), alpha = .9,
+             size = 2.5, fill = 'transparent') + # shape = 21, 
+  # color scale
+  scale_color_discrete(type = palette_expbis) +
+  # y-axis scale
+  scale_y_continuous(limits = c(0, 15000),
+                     breaks = c(0, 1000, 5000, 10000, 15000),
+                     labels = c('0', '1000', '5000', '10000', '15000')) +
+  # labels
+  labs(x = 'Time (days)', y = 'Cell density (cells per mL)') +
+  # theme
+  theme_classic() +
+  theme(legend.position = 'bottom',
+        legend.title = element_text(size = 10, color = 'grey5'),
+        legend.text = element_text(size = 8, color = 'grey5'),
+        legend.background = element_rect(linewidth = .5, color = 'grey10'),
+        legend.ticks = element_line(linewidth = .2, color = 'grey25'),
+        # Panel
+        panel.grid = element_blank())
+    
+# Nice! Save that
+# ggsave('Plots/Experiments/Starvation_exp_2024_celldens.tiff',
 #        dpi = 300, height = 85, width = 164, units = 'mm', compression = 'lzw')
