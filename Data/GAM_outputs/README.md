@@ -1,0 +1,1 @@
+Folder for data files created by R scripts applying GAMs to REPHY data (scripts 05 and 07 in the repo). Several subfolders for GAMs with different response variables. Also contains 1st derivatives calculated from GAM predictions.
