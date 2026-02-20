@@ -1,0 +1,2 @@
+This is the 'root' folder for data files used in the R project. No actual data files are in there, this folder is here to provide an example of the correct strucure of the *Data* folder you need to have for the R scripts to function correctly.
+  All relevant data can be downloaded from the SEANOE dataset associated with this study: https://doi.org/10.17882/111237
