@@ -1,0 +1,1 @@
+Data folder with shapefiles of european rivers. Obtained and slightly modified from https://www.hydrosheds.org/products/gloric (via https://milospopovic.net/map-rivers-with-sf-and-ggplot2-in-r/), with help from Simon Oiry (thanks! https://oirysimon.com/)
