@@ -474,4 +474,46 @@ ggplot(data = subset(CPR_data_hovmoller, region > 0)) +
 # ggsave('Plots/CPR/FigS4B_CPR_Hovmoller_sampling_effort.tiff', height = 95, width = 160, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
+### Bar plot of Dinophysis presence per month ####
+
+# The idea here is to show that summer is by far the season with the most
+# Dinophysis occurrence in the dataset. For this, we will plot a bar plot
+# of the percentage of "Dinophysis positive" samples per month, for each region.
+
+# Introduce a dummy "Dinophysis positive" variable that tells us when a sample 
+# had at least 1 Dinophysis
+
+CPR_data_month <- CPR_data_regions %>%
+  mutate(Dinodummy = ifelse(Dinophysis_Total >= 1, 1, 0)) %>%
+  group_by(region, Month) %>%
+  summarise(
+    # Number of samples with Dinophysis in a bin
+    nsamples_Dino = sum(Dinodummy),
+    # Total number of samples in a bin
+    nsamples = n(),
+    .groups = 'keep') %>%
+  mutate(prop_pos = nsamples_Dino/nsamples)
+
+# Plot command
+ggplot(data = subset(CPR_data_month, region > 0)) +
+  geom_col(aes(x = Month, 
+                     # Get the proportion into a percentage
+                     y = prop_pos*100, 
+                     fill = region
+  )) +
+  scale_fill_continuous(palette = df_color$color, guide = 'none') +
+  facet_wrap_color(facets = 'region', colors = df_color) +
+  scale_x_continuous(limits = c(0, 13), 
+                     breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  labs(y = 'Percentage of samples with Dinophysis present') +
+  theme_classic()
+
+# Perfect! We see that the peak of Dinophysis presence really is in the summer
+# months in regions 2, 3 and 4, and that the genus is more frequently observed
+# in regions 3 and 4 compared to 2. We can't say much about region 1 because of
+# low sampling effort compared to the others.
+## Save that!
+# ggsave('Plots/CPR/FigS5_CPR_Dinophysis_monthly.tiff', height = 120, width = 160,
+#        units = 'mm', dpi = 300, compression = 'lzw')
+
 ####-------------------------- End of script ------------------------------####
