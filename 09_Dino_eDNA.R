@@ -1,7 +1,7 @@
 #### Script: Analysing and plotting eDNA data (metabarcoding) from 2 winter ###
 ### periods in South Brittany ###
 # Author: V. POCHIC
-# Last modif: 2026/02/20
+# Last modif: 2026/06/10
 
 ## General information ####
 
@@ -18,7 +18,7 @@
 
 ## Outputs:
 ## Figure:
-# Figure S5 - presence of Dinophysis eDNA in winter
+# Figure S6 - presence of Dinophysis eDNA in winter
 
 #### Required packages ####
 library(tidyverse)
@@ -152,7 +152,7 @@ ggplot(MetaB_Dino, aes(x = Date, y = Depth,
         strip.text = element_text(color = 'grey5', size = 7.5))
 
 ## Save this (approximately good-looking) plot
-# ggsave('Plots/eDNA/FigS5_eDNA_Dinophysis_OL-BM.tiff', height = 150, width = 250,
+# ggsave('Plots/eDNA/FigS6_eDNA_Dinophysis_OL-BM.tiff', height = 150, width = 250,
 # units = 'mm', compression = 'lzw', dpi = 300)
 
 ####-------------------------- End of script ------------------------------####

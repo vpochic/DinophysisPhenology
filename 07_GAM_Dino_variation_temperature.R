@@ -1,7 +1,7 @@
 #### Script: Generalised Additive Model (GAM) of Dinophysis variation rate as a
 ### function of temperature ###
 # Author: V. POCHIC
-# Last modif: 2026/02/20
+# Last modif: 2026/06/10
 
 ## General information ####
 
@@ -20,7 +20,7 @@
 ## data we need
 
 ## Outputs:
-## Figure S10: Dinophysis variation rate as a function of temperature
+## Figure S12: Dinophysis variation rate as a function of temperature
 
 ### Required Packages ####
 library(tidyverse)
@@ -214,7 +214,7 @@ ggplot(gam_deriv_newdata, aes(x = TEMP, y = fit_resp, color = Code_point_Libelle
         legend.ticks = element_line(color = 'black', linewidth = .25))
 
 # Saving the plot
-# ggsave('Plots/GAMs/Dinophysis/FigS10_gam_deriv_8_sites.tiff',
+# ggsave('Plots/GAMs/Dinophysis/FigS12_gam_deriv_8_sites.tiff',
 # dpi = 300, height = 130, width = 160, units = 'mm', compression = 'lzw')
 
 ####-------------------------- End of script ------------------------------####

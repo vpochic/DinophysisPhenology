@@ -1,6 +1,6 @@
 #### Script: analysing Continuous Plankton Recorder (CPR) data ###
 # Author: V. POCHIC 
-# Last modif: 2026/02/20
+# Last modif: 2026/06/10
 
 ## General information ####
 
@@ -21,6 +21,7 @@
 ## Figures:
 # Figure 1 A and B - Seasonality of Dinophysis in European waters
 # Figure S4 A and B - Sampling effort in the CPR dataset
+# Figure S5 - Dinophysis presence in the 4 regions (monthly frequence)
 
 ### Required packages ####
 
@@ -331,17 +332,17 @@ ggplot() +
             aes(xmin = lon.bin-.25, xmax = lon.bin+.25,
                 ymin = lat.bin-.25, ymax = lat.bin+.25,
                 fill = 
-                  log(prop_pos+1) # Dinophysis presence version
-                  # log10(nsamples) # Sampling effort version
+                  # log(prop_pos+1) # Dinophysis presence version
+                  log10(nsamples) # Sampling effort version
                   )) +
   # adjust the limits of the color scale so it is compatible with the second
   # plot. No legend here.
   scale_fill_viridis(
-    # option = 'plasma' # for sampling effort version
+    option = 'plasma' # for sampling effort version
         # All 3 options below are for Dinophysis presence version
-    limits = c(0, log(0.5+1)), #
-    breaks = c(log(0+1), log(0.1+1), log(0.25+1), (log(0.5+1))), #
-    labels = c('0', '0.1', '0.25', '0.5') #
+    # limits = c(0, log(0.5+1)), #
+    # breaks = c(log(0+1), log(0.1+1), log(0.25+1), (log(0.5+1))), #
+    # labels = c('0', '0.1', '0.25', '0.5') #
     ) + 
   # Plotting the land
   geom_polygon(data = Worldmap, aes(x = long, y = lat, group = group), 
@@ -371,11 +372,11 @@ ggplot() +
   labs(title = 'A',
        y = 'Latitude (degrees)', x = 'Longitude (degrees)',
        fill = 
-         'Dinophysis presence
-(proportion of samples,
-log scale)'
-#        'Sampling effort
-# (log10[number of samples])'
+#          'Dinophysis presence
+# (proportion of samples,
+# log scale)'
+       'Sampling effort
+(log10[number of samples])'
   )+
   theme_bw() +
   theme(legend.position = 'bottom',
@@ -437,26 +438,26 @@ df_color <- data.frame(name = 1:4,
 # One command, 2 versions of the plot (adjust comments accordingly)
 ggplot(data = subset(CPR_data_hovmoller, region > 0)) +
   geom_tile(aes(x = Year, y = Month, fill = 
-                  # log(prop_pos+1) # Dinophysis presence version
-                  log10(nsamples) # Sampling effort version
+                  log(prop_pos+1) # Dinophysis presence version
+                  # log10(nsamples) # Sampling effort version
                 )) +
   scale_fill_viridis(
-    option = 'plasma' # For sampling effort version
+    # option = 'plasma' # For sampling effort version
     ## All 3 options below are for the Dinophysis presence version.
-    # limits = c(0, log(2)), #
-    # breaks = c(log(0+1), log(0.1+1), log(0.25+1), log(0.5+1), log(2)), #
-    # labels = c('0', '0.1', '0.25', '0.5', '1') #
+    limits = c(0, log(2)), #
+    breaks = c(log(0+1), log(0.1+1), log(0.25+1), log(0.5+1), log(2)), #
+    labels = c('0', '0.1', '0.25', '0.5', '1') #
   ) +
   facet_wrap_color(facets = 'region', colors = df_color) +
   scale_y_continuous(limits = c(0, 13), 
                      breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
   labs(title = 'B',
        fill = 
-                'Sampling effort
-         (log10[number of samples])'
-#          'Dinophysis presence
-# (proportion of samples,
-# log scale)'
+         #        'Sampling effort
+         # (log10[number of samples])'
+         'Dinophysis presence
+(proportion of samples,
+log scale)'
   ) +
   theme_classic() +
   theme(legend.position = 'bottom',
@@ -474,11 +475,11 @@ ggplot(data = subset(CPR_data_hovmoller, region > 0)) +
 # ggsave('Plots/CPR/FigS4B_CPR_Hovmoller_sampling_effort.tiff', height = 95, width = 160, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
-### Bar plot of Dinophysis presence per month ####
+### Histogram of Dinophysis presence per month ####
 
 # The idea here is to show that summer is by far the season with the most
-# Dinophysis occurrence in the dataset. For this, we will plot a bar plot
-# of the percentage of "Dinophysis positive" samples per month, for each region.
+# Dinophysis occurrence in the dataset. For this, we will plot a histogram
+# of Dinophysis positive samples per month, for each region.
 
 # Introduce a dummy "Dinophysis positive" variable that tells us when a sample 
 # had at least 1 Dinophysis

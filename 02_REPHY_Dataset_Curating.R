@@ -1,6 +1,6 @@
 #### Script REPHY: curating data ###
 # Author: V. POCHIC 
-# Last modif: 2026/02/20
+# Last modif: 2026/05/18
 
 ## General information ####
 
@@ -27,6 +27,7 @@
 ### Required packages ####
 
 library(tidyverse)
+library(deeptime)
 
 ####-----------------------------------------------------------------------####
 #### Import data ####
@@ -432,10 +433,36 @@ Season_Dino_fortnight <- Season_Dino_fortnight %>%
   # observed and counted
   mutate(true_count = Comptage/100)
 
+# Little fancy trick: we want to color the top labels of each subplot by
+# phenoregion. We will create a dataframe with the names of the sampling sites
+# that make our facets, and the colors we want associated to them.
+# The name of the columns in the dataframe is super important here!
+# (i.e., you have to name them 'name' and 'color')
+df_color <- data.frame(
+  name = c('Point 1 Boulogne', 'At so',
+           'Antifer ponton pétrolier', 'Cabourg',
+           'les Hébihens', 'Loguivy',
+           'Men er Roue', 'Ouest Loscolo',
+           'Le Cornard', 'Auger',
+           'Arcachon - Bouée 7', 'Teychan bis',
+           'Parc Leucate 2', 'Bouzigues (a)',
+           'Sète mer', 'Diana centre'),
+  color = c('#B4582A', '#B4582A', 
+            '#E20000', '#E20000',
+            '#173B95', '#173B95',
+            '#6597E1', '#6597E1',
+            '#437A00', '#437A00',
+            '#F8BD3A', '#F8BD3A',
+            '#FBA3CD', '#FBA3CD',
+            '#FBA3CD',
+            '#791E40'))
+
 ## Plot command
 ggplot(Season_Dino_fortnight, aes(x = Fortnight, y = true_count, fill = Taxon)) +
   geom_col() +
-  facet_wrap(facets = 'Code_point_Libelle', scales = 'free_y') +
+  # Facet wrap
+  facet_wrap_color(facets = c('Code_point_Libelle'), scales = 'free_y',
+                   colors = df_color) +
   # axis
   scale_x_continuous(breaks = c(1, 8, 16, 20, 26),
                      labels = c('1', '8', '16', '20', '26')) +
@@ -468,7 +495,8 @@ ggplot(Season_Dino_fortnight, aes(x = Fortnight, y = true_count, fill = Taxon)) 
     legend.title = element_text(size=9),
     legend.text = element_text(size=8),
     legend.position = 'bottom',
-    legend.background = element_rect(color = 'black', linewidth = .25)
+    legend.background = element_rect(color = 'black', linewidth = .25),
+    strip.background = element_rect(color = 'white')
   )
 
 ## Save this awesome plot as Fig S2

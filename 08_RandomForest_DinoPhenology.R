@@ -47,7 +47,7 @@
 ## model runs (1 for each version of the model)
 
 ## Figures:
-# Figures S8 and S9 - Evaluation of the performance of RF models (elements of
+# Figures S10 and S11 - Evaluation of the performance of RF models (elements of
 # the figures are generated, the full figure was assembled in ppt)
 
 #### Required packages ####
@@ -453,7 +453,7 @@ geom_point(aes(x = deriv, y = .pred), color = '#2156A1') +
 theme_classic()
 
 # Save this plot
-# ggsave('Plots/RF_models/FigS8A_Modelperf_11sites_valid.tiff',
+# ggsave('Plots/RF_models/FigS10A_Modelperf_11sites_valid.tiff',
 #        height = 140, width = 140, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
@@ -481,7 +481,7 @@ variable distribution', x = 'Count', y = 'Value of response variable') +
   theme_classic()
 
 # Save this plot
-# ggsave('Plots/RF_models/FigS8B_RMSE_vs_values_11sites.tiff',
+# ggsave('Plots/RF_models/FigS10B_RMSE_vs_values_11sites.tiff',
 #        height = 140, width = 140, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
@@ -675,7 +675,7 @@ ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean)) +
   theme_classic()
 
 # Save the plot
-# ggsave('Plots/RF_models/FigS8C_VIP_RandomForest_meansd_11sites.tiff', width = 100,
+# ggsave('Plots/RF_models/FigS10C_VIP_RandomForest_meansd_11sites.tiff', width = 100,
 # height = 120, units = 'mm', compression = 'lzw', dpi = 300)
 
 ####-----------------------------------------------------------------------####
@@ -953,7 +953,7 @@ ggplot(MeR_prediction) +
   theme_classic()
 
 # Save this plot
-# ggsave('Plots/RF_models/FigS9A_Modelperf_4sites_valid.tiff',
+# ggsave('Plots/RF_models/FigS11A_Modelperf_4sites_valid.tiff',
 #        height = 140, width = 140, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
@@ -981,7 +981,7 @@ variable distribution', x = 'Value of response variable', y = 'Count') +
   theme_classic()
 
 # Save this plot
-# ggsave('Plots/RF_models/FigS9B_RMSE_vs_values_4sites.tiff',
+# ggsave('Plots/RF_models/FigS11B_RMSE_vs_values_4sites.tiff',
 #        height = 140, width = 140, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
@@ -1183,7 +1183,7 @@ ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean)) +
   theme_classic()
 
 # Save the plot
-# ggsave('Plots/RF_models/FigS9C_VIP_RandomForest_meansd_4sites.tiff', width = 164,
+# ggsave('Plots/RF_models/FigS11C_VIP_RandomForest_meansd_4sites.tiff', width = 164,
 #        height = 180, units = 'mm', compression = 'lzw', dpi = 300)
 
 ####-------------------------- End of script ------------------------------####

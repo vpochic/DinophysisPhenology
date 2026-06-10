@@ -1,7 +1,7 @@
 #### Script: Analysing and plotting cell counts from Dinophysis starvation
 ### experiments ###
 # Author: V. POCHIC
-# Last modif: 2026/02/20
+# Last modif: 2026/06/10
 
 ## General information ####
 
@@ -18,8 +18,8 @@
 
 ## Outputs:
 ## Figures:
-# Figure 8 - Dinophysis population dynamics during starvation (from 2016 exp)
-# Figure S12 - Fed vs Unfed Dinophysis population dynamics (from 2024 exp)
+# Figure 7A - Dinophysis population dynamics during starvation (from 2016 exp)
+# Figure S14 - Fed vs Unfed Dinophysis population dynamics (from 2024 exp)
 
 ### Required packages ####
 library(tidyverse)
@@ -106,7 +106,7 @@ ggplot(data = Exp_data_stats_plot) +
   theme_classic()
 
 # Nice! Save that
-# ggsave('Plots/Experiments/Fig8_Starvation_exp_2016_celldens.tiff',
+# ggsave('Plots/Experiments/Fig7A_Starvation_exp_2016_celldens.tiff',
 #        dpi = 300, height = 85, width = 164, units = 'mm', compression = 'lzw')
 
 #### 2024 Experiment ####
@@ -142,7 +142,7 @@ ggplot(data = Exp_data_2024) +
         panel.grid = element_blank())
     
 # Nice! Save that
-# ggsave('Plots/Experiments/FigS12_Starvation_exp_2024_celldens.tiff',
+# ggsave('Plots/Experiments/FigS14_Starvation_exp_2024_celldens.tiff',
 #        dpi = 300, height = 85, width = 164, units = 'mm', compression = 'lzw')
 
 ####-------------------------- End of script ------------------------------####

@@ -1,7 +1,7 @@
 #### Script: Generalised Additive Models (GAMs) of Dinophysis, Mesodinium ###
 ### and alloxanthin based on REPHY data ###
 # Author: V. POCHIC
-# Last modif: 2026/02/20
+# Last modif: 2026/06/10
 
 ## General information ####
 
@@ -36,10 +36,10 @@
 ## Figures:
 # Figure 3 - Phenology GAM of Dinophysis
 # Figure S3 - Dinophysis GAM fit on different years at sampling site Ouest Loscolo
-# Figures S13-S18 - diagnostic plots for GAMs
-# Figure 6 - Phenology GAMs of alloxanthin/Mesodinium/Dinophysis at sampling
+# Figures S15-S20 - diagnostic plots for GAMs
+# Figure 5 - Phenology GAMs of alloxanthin/Mesodinium/Dinophysis at sampling
 # sites Cabourg and Ouest Loscolo
-# Figure S11 - Phenology GAMs of alloxanthin/Mesodinium/Dinophysis at sampling
+# Figure S13 - Phenology GAMs of alloxanthin/Mesodinium/Dinophysis at sampling
 # sites Antifer and Men er Roue
 
 #### Required packages ####
@@ -50,6 +50,7 @@ library(mgcv)
 library(gratia)
 library(gcplyr)
 library(ggpubr)
+library(deeptime)
 
 ####-----------------------------------------------------------------------####
 #### Import data ####
@@ -425,7 +426,7 @@ response_pred_plot <- as.data.frame(pred_plot) %>%
   mutate(across(c('median.fit', 'lwrS', 'uprS', 'lwrP', 'uprP'), ~ ilink(.)))
 
 # And save that shall we
-# write.csv2(response_pred_plot, 
+# write.csv2(response_pred_plot,
 #            'Data/GAM_outputs/Dinophysis/All_sites/Dino_GAM_response_pred.csv',
 #            row.names = FALSE, fileEncoding = 'ISO-8859-1')
 
@@ -579,6 +580,30 @@ pred_plot_cells_per_L <- response_pred_plot %>%
   mutate(across(c('median.fit', 'uprS', 'lwrS'), ~ .*100
   ))
 
+# Little fancy trick: we want to color the top labels of each subplot by
+# phenoregion. We will create a dataframe with the names of the sampling sites
+# that make our facets, and the colors we want associated to them.
+# The name of the columns in the dataframe is super important here!
+# (i.e., you have to name them 'name' and 'color')
+df_color <- data.frame(
+                       name = c('Point 1 Boulogne', 'At so',
+                                              'Antifer ponton pétrolier', 'Cabourg',
+                                              'les Hébihens', 'Loguivy',
+                                              'Men er Roue', 'Ouest Loscolo',
+                                              'Le Cornard', 'Auger',
+                                              'Arcachon - Bouée 7', 'Teychan bis',
+                                              'Parc Leucate 2', 'Bouzigues (a)',
+                                              'Sète mer', 'Diana centre'),
+                        color = c('#B4582A', '#B4582A', 
+                                  '#E20000', '#E20000',
+                                  '#173B95', '#173B95',
+                                  '#6597E1', '#6597E1',
+                                  '#437A00', '#437A00',
+                                  '#F8BD3A', '#F8BD3A',
+                                  '#FBA3CD', '#FBA3CD',
+                                  '#FBA3CD',
+                                  '#791E40'))
+
 # New plot in cells per L
 
 ggplot(pred_plot_cells_per_L, aes(x = Day, y = median.fit, 
@@ -600,12 +625,14 @@ ggplot(pred_plot_cells_per_L, aes(x = Day, y = median.fit,
              size = .8, alpha = .5) +
   
   # Facet wrap
-  facet_wrap(facets = c('Code_point_Libelle'), scales = 'free_y') +
+  facet_wrap_color(facets = c('Code_point_Libelle'), scales = 'free_y',
+             colors = df_color) +
   # Set the color palette :
   scale_color_discrete(type = pheno_palette16, guide = 'none') +
   scale_fill_discrete(type = pheno_palette16, guide = 'none') +
   theme_classic() +
-  theme(strip.text.x = element_text(size = 7.2, colour = "black"))
+  theme(strip.text.x = element_text(size = 7.2, colour = "black"),
+        strip.background = element_rect(colour = 'white'))
 
 # Saving plot
 # ggsave('Plots/GAMs/Dinophysis/Fig3_gam_Dino_cells_per_L.tiff',
@@ -2617,13 +2644,13 @@ succession_Cab <- ggarrange(plot_Allo_Cabourg, plot_Meso_Cabourg, plot_Dino_Cabo
 
 
 ## Combining plots ####
-#--- Cabourg + Ouest Loscolo (Figure 6) ---####
+#--- Cabourg + Ouest Loscolo (Figure 5) ---####
 
 ggarrange(succession_Cab, succession_OL, nrow = 1,
           align = 'h')
 
 # Save that pretty stuff
-# ggsave('Plots/GAMs/Successions/Fig6_Succession_plot_Cab_OL.tiff',
+# ggsave('Plots/GAMs/Successions/Fig5_Succession_plot_Cab_OL.tiff',
 #        width = 154, height = 170, units = 'mm', dpi = 300, compression = 'lzw')
 
 ### Little hidden bonus: getting peak dates for the 3 GAMs
@@ -2664,7 +2691,7 @@ max_dino_OL <- gam_Dino_OL %>%
 ggarrange(succession_Antifer, succession_MeR, nrow = 1,
           align = 'h')
 
-# ggsave('Plots/GAMs/Successions/FigS11_Succession_plot_Antifer_MeR.tiff',
+# ggsave('Plots/GAMs/Successions/FigS13_Succession_plot_Antifer_MeR.tiff',
 #        width = 154, height = 170, units = 'mm', dpi = 300, compression = 'lzw')
 
 ####-------------------------- End of script ------------------------------####

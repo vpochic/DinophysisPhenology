@@ -1,6 +1,6 @@
 #### Script: Visualisations of multiyear data on Dinophysis phenology ###
 # Author: V. POCHIC
-# Last modif: 2026/02/18
+# Last modif: 2026/06/10
 
 ## General information ####
 
@@ -26,9 +26,9 @@
 
 ## Figures:
 # Figure 4 - Timing of Dinophysis maxima over the study period (+ GLM fit)
-# Figure 5 - Timing of Dinophysis maxima + heatmap of environmental variables
-# Figure S6 - Timing of Dinophysis maxima over latitude
-# Figure S7 - Timing of Dinophysis maxima + heatmap of ssr
+# Figure S7 - Timing of Dinophysis maxima over latitude
+# Figure S8 - Timing of Dinophysis maxima + heatmap of environmental variables
+# Figure S9 - Timing of Dinophysis maxima + heatmap of ssr
 
 #### Required packages ####
 
@@ -42,6 +42,8 @@ library(ggnewscale)
 library(cmocean)
 library(RColorBrewer)
 library(ggpubr)
+library(deeptime)
+
 
 ####-----------------------------------------------------------------------####
 #### Evolution of the timing of maximum count over the study period ####
@@ -494,6 +496,25 @@ pheno_palette12 <- c('red3', 'orangered', '#2156A1', '#5995E3',
                      '#1F3700', '#649003','#F7B41D', '#FBB646',
                      '#642C3A', '#DEB1CC', '#FC4D6B', '#791D40')
 
+# Little fancy trick: we want to color the top labels of each subplot by
+# phenoregion. We will create a dataframe with the names of the sampling sites
+# that make our facets, and the colors we want associated to them.
+# The name of the columns in the dataframe is super important here!
+# (i.e., you have to name them 'name' and 'color')
+df_color <- data.frame(
+  name = c('Antifer ponton pétrolier', 'Cabourg',
+           'Men er Roue', 'Ouest Loscolo',
+           'Le Cornard', 'Auger',
+           'Arcachon - Bouée 7', 'Teychan bis',
+           'Parc Leucate 2', 'Bouzigues (a)',
+           'Sète mer', 'Diana centre'),
+  color = c('#E20000', '#E20000',
+            '#6597E1', '#6597E1',
+            '#437A00', '#437A00',
+            '#F8BD3A', '#F8BD3A',
+            '#FBA3CD', '#FBA3CD',
+            '#FBA3CD','#791E40'))
+
 # Plot (we multiply the predictions made on the beta-transformed variable
 # by a factor so that it fits the true data)
 ggplot(Data_trends)+
@@ -523,14 +544,17 @@ ggplot(Data_trends)+
   # Labels
   labs(x = "Year", 
        y = "Day of maximum Dinophysis count") +
-  facet_wrap(facets = 'Code_point_Libelle') +
+  # Facet wrap
+  facet_wrap_color(facets = c('Code_point_Libelle'), scales = 'free_y',
+                   colors = df_color) +
   theme_classic() +
   theme(strip.text = element_text(
-    size = 7, color = 'black'))
+    size = 7, color = 'black'),
+    strip.background = element_rect(colour = 'white'))
 
 # Good sh*t
-# ggsave('Plots/REPHY/Fig4_Trends_maxima_Dino.tiff', dpi = 300, height = 150, width = 164,
-#                units = 'mm', compression = 'lzw')
+ggsave('Plots/REPHY/Fig4_Trends_maxima_Dino.tiff', dpi = 300, height = 115, width = 164,
+               units = 'mm', compression = 'lzw')
 
 ####-----------------------------------------------------------------------####
 #### Environmental data ####
@@ -891,7 +915,7 @@ plot_chloroa <- ggplot() +
 # plot_temp
 
 # Great! Let's save that (for plot_ssr only)
-# ggsave('Plots/REPHY/FigS7_Dino_gam_max_ssr_RF_plot.tiff', dpi = 600, height = 150, width = 100,
+# ggsave('Plots/REPHY/FigS9_Dino_gam_max_ssr_RF_plot.tiff', dpi = 600, height = 150, width = 100,
 #        units = 'mm', compression = 'lzw')
 
 #### Arranging 4 heatmap plots on the same figure ####
@@ -904,7 +928,7 @@ plot_4heatmaps <- ggarrange(plot_temp, plot_chloroa, plot_sali, plot_stratif,
 plot_4heatmaps
 
 # Saving
-# ggsave('Plots/REPHY/Fig5_Dino_4heatmaps_plot.tiff', dpi = 600, height = 160,
+# ggsave('Plots/REPHY/FigS8_Dino_4heatmaps_plot.tiff', dpi = 600, height = 160,
 #        width = 134, units = 'mm', compression = 'lzw')
 
 #### Plotting maxima by latitude ####
@@ -981,7 +1005,7 @@ ggplot(data  = subset(Maxima_Dino,
   theme_classic()
 
 # Save that good stuff
-# ggsave('Plots/REPHY/FigS6_Dino_maxima_by_latitude.tiff', dpi = 300, height = 150, width = 100,
+# ggsave('Plots/REPHY/FigS7_Dino_maxima_by_latitude.tiff', dpi = 300, height = 150, width = 100,
 #                units = 'mm', compression = 'lzw')
 
 ####-------------------------- End of script ------------------------------####

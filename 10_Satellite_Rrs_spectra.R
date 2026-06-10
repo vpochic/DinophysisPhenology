@@ -1,6 +1,6 @@
 #### Script : Rrs spectra from Sentinel-2 satellite images ###
 # Author : V. POCHIC 
-# Last modif : 2026/02/20
+# Last modif : 2026/06/10
 
 ## General information ####
 
@@ -18,7 +18,7 @@
 ## Outputs:
 
 ## Figure:
-# Figure 7 - Reflectance spectra of bloom and non-bloom pixels (RGB images were
+# Figure 6 - Reflectance spectra of bloom and non-bloom pixels (RGB images were
 # exported directly from the copernicus browser, and I then assembled the full
 # figure in ppt)
 
@@ -125,7 +125,7 @@ bloom')) +
 
 # Nice!
 # Save that
-# ggsave('Plots/Satellite/Fig7_Rrs_spectra_meso_blooms.tiff', height = 95, width = 82,
+# ggsave('Plots/Satellite/Fig6_Rrs_spectra_meso_blooms.tiff', height = 95, width = 82,
 #        units = 'mm', dpi = 300, compression = 'lzw')
 
 ####-------------------------- End of script ------------------------------####
