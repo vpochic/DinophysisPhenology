@@ -1,5 +1,5 @@
 # DinophysisPhenology
-This is the github repository for my (and my coauthor's) article on *Dinophysis* phenology in European waters. As of 2026/02/19, it is under review after we submitted it to Limnology and Oceanography (https://aslopubs.onlinelibrary.wiley.com/journal/19395590).
+This is the github repository for my (and my coauthors') article on *Dinophysis* phenology in European waters. As of 2026/02/19, it is under review after we submitted it to Limnology and Oceanography (https://aslopubs.onlinelibrary.wiley.com/journal/19395590).
 
 This github rep contains all the scripts necessary to analyse the data and produce the figures presented in the article.
 The data in question is deposited in a dataset on __SEANOE__ (https://doi.org/10.17882/111237)
