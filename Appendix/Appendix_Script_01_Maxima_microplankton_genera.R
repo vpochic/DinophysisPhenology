@@ -1,6 +1,6 @@
 #### Additional script: broad phenology of other microplankton genera ###
 # Author: V. POCHIC
-# Last modif: 2026/06/22
+# Last modif: 2026/06/23
 
 ## General information ####
 
@@ -24,10 +24,6 @@
 ## --> Data from oceanographic/atmospheric physical models
 
 ## Outputs:
-## Files:
-# Data/GLM_outputs/Table_S1_summary_glm_trends_beta.csv
-## --> Summary of the GLM for multiannual trends of timing of Dinophysis maxima
-
 ## Figures:
 # Figure A1 - Distribution of occurrences for different phyto genera
 # Figure A2 - Timing of Dinophysis (+ other genera) maxima over the study 
