@@ -3,3 +3,6 @@ These scripts perform additional analyses on the same datasets as the paper.
 
 Appendix_Script_01: broadly analyses the phenology of 3 microplankton genera (Alexandrium, Protoperidinium and Pseudo-nitzschia) to offer a comparison with
 Dinophysis, notably regarding the regularity of the yearly maximum.
+
+Appendix_Script_02: modifies the random forest models to exclude temperature (hypothesis: it dwarves the other predictors because it integrates too much 
+information) and creates a "wind speed" variable that integrates u and v zonal components of wind.
