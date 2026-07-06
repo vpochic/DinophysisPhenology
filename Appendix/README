@@ -6,3 +6,6 @@ Dinophysis, notably regarding the regularity of the yearly maximum.
 
 Appendix_Script_02: modifies the random forest models to exclude temperature (hypothesis: it dwarves the other predictors because it integrates too much 
 information) and creates a "wind speed" variable that integrates u and v zonal components of wind.
+
+Appendix_Script_03: plots data acquired with an imaging PAM fluorometer during the 2024 Dinophysis starvation experiment described in the paper. Preliminary,
+exploratory data, not necessarily representative of the entire set of measurements. Use and interpret at your own peril!
