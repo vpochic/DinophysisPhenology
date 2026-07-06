@@ -85,6 +85,6 @@ ggplot() +
                                     linewidth = .25))
 
 # I've seen better plots, but it's not awful. That will do.
-# ggsave('Appendix/Plots/Imaging_PAM_Fluo/FigA5_Imaging_PAM_Fluo_YPSII_day44.tiff',
+# ggsave('Appendix/Plots/Imaging_PAM_Fluo/FigA05_Imaging_PAM_Fluo_YPSII_day44.tiff',
 #        height = 100, width = 150, units = 'mm', dpi = 600, compression = 'lzw')
   
