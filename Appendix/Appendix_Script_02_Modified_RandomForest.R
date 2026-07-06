@@ -1,6 +1,6 @@
 #### Additional script: Modified random forests ###
 # Author: V. POCHIC
-# Last modif: 2026/06/23
+# Last modif: 2026/07/06
 
 ## General information ####
 
@@ -423,7 +423,7 @@ ggplot() +
   theme_classic()
 
 # Save this plot
-# ggsave('Plots/RF_models/Modified_RF/Modelperf_11sites_training.tiff',
+# ggsave('Appendix/Plots/RF_appendix/Modelperf_11sites_training.tiff',
 #        height = 140, width = 140, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
@@ -455,7 +455,7 @@ geom_point(aes(x = deriv, y = .pred), color = '#2156A1') +
 theme_classic()
 
 # Save this plot
-# ggsave('Plots/RF_models/Modified_RF/FigA03A_Modelperf_11sites_valid.tiff',
+# ggsave('Appendix/Plots/RF_appendix/FigA03A_Modelperf_11sites_valid.tiff',
 #        height = 140, width = 140, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
@@ -483,7 +483,7 @@ variable distribution', x = 'Count', y = 'Value of response variable') +
   theme_classic()
 
 # Save this plot
-ggsave('Plots/RF_models/Modified_RF/FigA03B_RMSE_vs_values_11sites.tiff',
+ggsave('Appendix/Plots/RF_appendix/FigA03B_RMSE_vs_values_11sites.tiff',
        height = 140, width = 140, units = 'mm',
        dpi = 300, compression = 'lzw')
 
@@ -677,7 +677,7 @@ ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean)) +
   theme_classic()
 
 # Save the plot
-# ggsave('Plots/RF_models/Modified_RF/FigA03C_VIP_RandomForest_meansd_11sites.tiff', width = 100,
+# ggsave('Appendix/Plots/RF_appendix/FigA03C_VIP_RandomForest_meansd_11sites.tiff', width = 100,
 # height = 120, units = 'mm', compression = 'lzw', dpi = 300)
 
 ####-----------------------------------------------------------------------####
@@ -925,7 +925,7 @@ final_res %>%
   theme_classic()
 
 # Save this plot
-# ggsave('Plots/RF_models/Modified_RF/Modelperf_4sites_training.tiff',
+# ggsave('Appendix/Plots/RF_appendix/Modelperf_4sites_training.tiff',
 #        height = 140, width = 140, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
@@ -957,7 +957,7 @@ ggplot(MeR_prediction) +
   theme_classic()
 
 # Save this plot
-# ggsave('Plots/RF_models/Modified_RF/FigA04A_Modelperf_4sites_valid.tiff',
+# ggsave('Appendix/Plots/RF_appendix/FigA04A_Modelperf_4sites_valid.tiff',
 #        height = 140, width = 140, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
@@ -985,7 +985,7 @@ variable distribution', x = 'Value of response variable', y = 'Count') +
   theme_classic()
 
 # Save this plot
-# ggsave('Plots/RF_models/Modified_RF/FigA04B_RMSE_vs_values_4sites.tiff',
+# ggsave('Appendix/Plots/RF_appendix/FigA04B_RMSE_vs_values_4sites.tiff',
 #        height = 140, width = 140, units = 'mm',
 #        dpi = 300, compression = 'lzw')
 
@@ -1187,7 +1187,7 @@ ggplot(data = dataplot_vip_stats, aes(x = Variable, y = value.mean)) +
   theme_classic()
 
 # Save the plot
-# ggsave('Plots/RF_models/Modified_RF/FigA04C_VIP_RandomForest_meansd_4sites.tiff', width = 164,
+# ggsave('Appendix/Plots/RF_appendix/FigA04C_VIP_RandomForest_meansd_4sites.tiff', width = 164,
 #        height = 180, units = 'mm', compression = 'lzw', dpi = 300)
 
 ####-------------------------- End of script ------------------------------####

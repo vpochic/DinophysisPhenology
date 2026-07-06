@@ -1,6 +1,6 @@
 #### Additional script: broad phenology of other microplankton genera ###
 # Author: V. POCHIC
-# Last modif: 2026/06/23
+# Last modif: 2026/07/06
 
 ## General information ####
 
@@ -606,9 +606,9 @@ annotate_figure(barplots4,
                                  gp=gpar(fontsize=10, col="black")))
 
 # Save the plot
-ggsave('Plots/REPHY/Additional_plots/FigA1_Barplots_4genera.tiff',
-       height = 180, width = 164, units = 'mm', compression = 'lzw',
-       dpi = 500)
+# ggsave('Appendix/Plots/Microplankton_genera/FigA01_Barplots_4genera.tiff',
+#        height = 180, width = 164, units = 'mm', compression = 'lzw',
+#        dpi = 500)
 
 # Ok it's quite nice! Now let's do the hard part: the yearly maxima.
 
@@ -1562,7 +1562,7 @@ annotate_figure(trendplots4,
                                   gp=gpar(fontsize=10, col="black")))
 
 # Save the plot
-# ggsave('Plots/REPHY/Additional_plots/FigA2_Trend_plots_4genera.tiff',
+# ggsave('Appendix/Plots/Microplankton_genera/FigA02_Trend_plots_4genera.tiff',
 #        height = 180, width = 164, units = 'mm', compression = 'lzw',
 #        dpi = 500)
 
