@@ -73,7 +73,8 @@ ggplot() +
   scale_color_discrete(palette = palette_2) +
   
   # Labels
-  labs(x = 'Light (ppfd)', y = 'PSII Quantum Yield',
+  labs(x = c(expression(paste('Light (ppfd, µmol of photons.m'^'-2','.s'^'-1',')'))), 
+                              y = 'Quantum Yield of PSII',
        color = 'Condition: ') +
   
   # Theme
