@@ -1,6 +1,6 @@
 #### Script REPHY: curating data ###
 # Author: V. POCHIC 
-# Last modif: 2026/05/18
+# Last modif: 2026/09/05
 
 ## General information ####
 
@@ -367,6 +367,11 @@ Season_Allo <- Table_pigments %>%
 
 # An interesting information in the dataset is when each Dinophysis species occur
 # (when identified) and in which propotion compared to all Dinophysis counts.
+
+# Import 'Season_Dino.csv' if needed. Careful, 'check.names = FALSE' is 
+# mandatory here to avoid fuckery.
+Season_Dino <- read.csv2('Data/REPHY_outputs/Season_Dino.csv', header = TRUE,
+                         check.names = FALSE, fileEncoding = 'ISO-8859-1')
 
 # We'll go through the trouble of starting again from Season_Dino as we need to
 # keep the correction made for the Arcachon sampling sites
