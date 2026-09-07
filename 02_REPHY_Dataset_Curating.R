@@ -511,7 +511,9 @@ ggplot(Season_Dino_fortnight, aes(x = Fortnight, y = true_count, fill = Taxon)) 
 ### The plot shows the prevalence of cells identified at the genus level
 # ('Dinophysis'), that explains our choice to work at the genus level
 
-# 
+
+# To illustrate a response to a reviewer, a plot showing the time series of
+# sampling site Ouest Loscolo with the nature of the taxon identified.
 ggplot() +
   geom_point(data = subset(Season_Dino_longer, Code_point_Libelle == 'Ouest Loscolo'
                            & Comptage != 0),
