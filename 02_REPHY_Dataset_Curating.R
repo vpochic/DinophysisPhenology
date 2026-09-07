@@ -1,6 +1,6 @@
 #### Script REPHY: curating data ###
 # Author: V. POCHIC 
-# Last modif: 2026/09/05
+# Last modif: 2026/09/07
 
 ## General information ####
 
@@ -511,5 +511,27 @@ ggplot(Season_Dino_fortnight, aes(x = Fortnight, y = true_count, fill = Taxon)) 
 ### The plot shows the prevalence of cells identified at the genus level
 # ('Dinophysis'), that explains our choice to work at the genus level
 
+# 
+ggplot() +
+  geom_point(data = subset(Season_Dino_longer, Code_point_Libelle == 'Ouest Loscolo'
+                           & Comptage != 0),
+             aes(x = ymd(Date), y = log(Comptage), fill = Taxon),
+             shape = 21, size = 3) +
+  scale_x_date(date_labels = '%Y') +
+  scale_fill_discrete(labels = c('Dinophysis', 'D. acuminata',
+                                 'D. sacculus', 'D. fortii',
+                                 'D. acuta', 'D. caudata',
+                                 'D. tripos', 'Dinophysis + Phalacroma'),
+                      # Color palette
+                      type = taxo_palette8,
+                      # guide legend
+                      guide = guide_legend(nrow = 2)) +
+  labs(subtitle = 'Identified taxa at sampling site Ouest Loscolo', x = 'Date', fill = 'Taxon:') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+
+# Save plot
+# ggsave('Plots/Reviews/Ouest_Loscolo_taxon_time_series.tiff', units = 'mm',
+#        width = 220, height = 145, compression = 'lzw')
 
 ####-------------------------- End of script ------------------------------####
