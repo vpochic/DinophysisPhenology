@@ -1,4 +1,4 @@
-# DinophysisPhenology
+# DinophysisPhenology [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22685306.svg)](https://doi.org/10.5281/zenodo.22685306)
 This is the github repository for my (and my coauthors') article on *Dinophysis* phenology in European waters. As of 2026/09/10, it is under a third round of review after we submitted it to Limnology and Oceanography (https://aslopubs.onlinelibrary.wiley.com/journal/19395590). This repository is archived on Zenodo, under the following doi: https://doi.org/10.5281/zenodo.22685306
 
 This github rep contains all the scripts necessary to analyse the data and produce the figures presented in the article.
